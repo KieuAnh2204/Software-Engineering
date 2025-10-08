@@ -1,0 +1,52 @@
+Tôi muốn xây dựng một ứng dụng web **FoodFast Delivery** theo mô hình **Microservices** với frontend cho khách hàng và dashboard admin.  
+
+### Yêu cầu chính:  
+1. **Frontend (User Website)**  
+   - Trang chủ hiển thị danh sách các nhà hàng (lấy từ database MongoDB).  
+   - Khi chọn một nhà hàng → hiển thị danh sách món ăn.  
+   - Cho phép người dùng thêm món vào giỏ hàng, chỉnh sửa giỏ hàng.  
+   - Người dùng có thể đăng ký / đăng nhập. Sau khi tạo tài khoản, người dùng cập nhật:  
+     • Họ tên  
+     • Email  
+     • Ảnh đại diện (upload)  
+     • Địa chỉ giao hàng (có thể thay đổi)  
+   - Thanh toán giỏ hàng (giả lập Payment Gateway).  
+   - Sau khi thanh toán → gửi email thông báo đơn hàng thành công.  
+   - Giao diện thân thiện, dễ sử dụng, responsive.  
+
+2. **Admin Dashboard (Quản trị hệ thống)**  
+   - Đăng nhập admin.  
+   - Quản lý nhà hàng (thêm / sửa / xóa).  
+   - Quản lý món ăn (liên kết với nhà hàng).  
+   - Quản lý đơn hàng: xem chi tiết, theo dõi trạng thái (Pending, Preparing, Delivering by Drone, Completed).  
+   - Quản lý người dùng (xem danh sách, chỉnh sửa hoặc vô hiệu hóa tài khoản).  
+
+3. **Microservice Architecture**  
+   - **User Service**: quản lý người dùng, xác thực JWT, lưu user vào MongoDB.  
+   - **Restaurant Service**: quản lý nhà hàng và món ăn (MongoDB collections: `restaurants`, `foods`).  
+   - **Order Service**: quản lý giỏ hàng, đơn hàng, trạng thái (MongoDB collection `orders`).  
+   - **Notification Service**: gửi email khi đơn hàng thành công.  
+   - Các service giao tiếp với nhau qua **RabbitMQ (event-driven)**.  
+   - Sử dụng **Docker Compose** để chạy các container (frontend, backend services, MongoDB, rabbitmq).  
+
+4. **Database**  
+   - MongoDB (mỗi service có database riêng).  
+   - Ví dụ:  
+     - userDB → collection: users  
+     - restaurantDB → collections: restaurants, foods  
+     - orderDB → collection: orders  
+     - notificationDB → collection: emails  
+
+5. **Tech stack gợi ý**  
+   - Frontend: React + TailwindCSS.  
+   - Backend: Node.js (Express hoặc NestJS) + Mongoose ODM.  
+   - Database: MongoDB.  
+   - Messaging: RabbitMQ.  
+   - Auth: JWT.  
+   - Deployment: Docker Compose.  
+
+### Output mong muốn:  
+- Tạo code frontend React (các trang: Home, Restaurant detail, Cart, Profile, Checkout, Login/Register).  
+- Tạo code backend microservices (User, Restaurant, Order, Notification) kết nối MongoDB.  
+- Tạo Admin Dashboard (React hoặc Next.js) để quản lý toàn bộ hệ thống.  
+- Cung cấp file Docker Compose để khởi chạy toàn bộ hệ thống (frontend, backend, mongo, rabbitmq).  
