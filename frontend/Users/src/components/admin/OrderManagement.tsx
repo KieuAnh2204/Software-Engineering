@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Search, Eye } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,8 +30,6 @@ import {
 import { Label } from "@/components/ui/label";
 import { OrderStatusStepper } from "@/components/OrderStatusStepper";
 import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Order } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -39,26 +37,9 @@ export default function OrderManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const { toast } = useToast();
 
   const { data: orders = [], isLoading } = useQuery<Order[]>({
     queryKey: ["/api/admin/orders"],
-  });
-
-  const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      apiRequest(`/api/admin/orders/${id}/status`, "PATCH", { status }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
-      toast({ title: "Order status updated successfully" });
-      setSelectedOrder(null);
-    },
-    onError: () => {
-      toast({
-        title: "Failed to update order status",
-        variant: "destructive",
-      });
-    },
   });
 
   const filteredOrders = useMemo(() => {
@@ -74,12 +55,6 @@ export default function OrderManagement() {
       return matchesSearch && matchesStatus;
     });
   }, [orders, searchQuery, filterStatus]);
-
-  const handleUpdateStatus = (status: string) => {
-    if (selectedOrder) {
-      updateStatusMutation.mutate({ id: selectedOrder.id, status });
-    }
-  };
 
   const getStatusVariant = (status: string) => {
     switch (status) {
@@ -226,27 +201,13 @@ export default function OrderManagement() {
               <Separator />
 
               <div>
-                <Label className="mb-4 block">Order Status</Label>
+                <div className="flex items-center justify-between mb-4">
+                  <Label>Order Status</Label>
+                  <Badge variant={getStatusVariant(selectedOrder.status)} data-testid="badge-order-status">
+                    {selectedOrder.status}
+                  </Badge>
+                </div>
                 <OrderStatusStepper currentStatus={selectedOrder.status as "pending" | "preparing" | "delivering" | "completed"} />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Update Status</Label>
-                <Select 
-                  defaultValue={selectedOrder.status}
-                  onValueChange={handleUpdateStatus}
-                  disabled={updateStatusMutation.isPending}
-                >
-                  <SelectTrigger data-testid="select-update-status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="preparing">Preparing</SelectItem>
-                    <SelectItem value="delivering">Delivering</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
           )}
