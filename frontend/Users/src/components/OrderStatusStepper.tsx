@@ -9,7 +9,6 @@ interface Step {
 }
 
 const steps: Step[] = [
-  { id: "pending", label: "Order Placed" },
   { id: "preparing", label: "Preparing" },
   { id: "delivering", label: "Delivering by Drone" },
   { id: "completed", label: "Delivered" },
@@ -20,14 +19,17 @@ interface OrderStatusStepperProps {
 }
 
 export function OrderStatusStepper({ currentStatus }: OrderStatusStepperProps) {
-  const currentIndex = steps.findIndex((s) => s.id === currentStatus);
+  const isPending = currentStatus === "pending";
+  const statusToDisplay = isPending ? "preparing" : currentStatus;
+  const currentIndex = steps.findIndex((s) => s.id === statusToDisplay);
 
   return (
     <div className="w-full py-6">
       <div className="flex items-center justify-between">
         {steps.map((step, index) => {
           const isCompleted = index < currentIndex;
-          const isCurrent = index === currentIndex;
+          const isCurrent = index === currentIndex && !isPending;
+          const isPendingFirst = index === 0 && isPending;
           const isActive = isCompleted || isCurrent;
 
           return (
@@ -46,7 +48,9 @@ export function OrderStatusStepper({ currentStatus }: OrderStatusStepperProps) {
                     "w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors",
                     isActive
                       ? "bg-primary border-primary text-primary-foreground"
-                      : "bg-background border-muted"
+                      : isPendingFirst
+                      ? "bg-background border-primary/50 text-muted-foreground"
+                      : "bg-background border-muted text-muted-foreground"
                   )}
                 >
                   {isCompleted ? (
