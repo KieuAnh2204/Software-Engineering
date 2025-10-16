@@ -14,7 +14,8 @@ const registerValidation = [
 ];
 
 const loginValidation = [
-  body('email').isEmail().normalizeEmail().withMessage('Invalid email'),
+  body('username').optional().trim().isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
+  body('email').optional().isEmail().normalizeEmail().withMessage('Invalid email'),
   body('password').notEmpty().withMessage('Password is required')
 ];
 
