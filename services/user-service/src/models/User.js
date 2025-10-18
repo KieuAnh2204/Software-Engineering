@@ -26,8 +26,8 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['user', 'owner', 'admin'],
-    default: 'user'
+    enum: ['customer', 'restaurant', 'admin'],
+    default: 'customer'
   },
   fullName: {
     type: String,
@@ -35,21 +35,91 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
+    required: [true, 'Phone number is required'],
     trim: true
   },
-  address: {
-    street: String,
-    city: String,
-    state: String,
-    zipCode: String
+  // Customer-specific fields
+  customerProfile: {
+    address: {
+      street: String,
+      ward: String,
+      district: String,
+      city: String,
+      coordinates: {
+        lat: Number,
+        lng: Number
+      }
+    },
+    defaultAddress: String,
+    favoriteRestaurants: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }],
+    orderHistory: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Order'
+    }]
+  },
+  // Restaurant-specific fields
+  restaurantProfile: {
+    restaurantName: {
+      type: String,
+      trim: true
+    },
+    description: String,
+    cuisineType: [{
+      type: String,
+      enum: ['Vietnamese', 'Chinese', 'Japanese', 'Korean', 'Thai', 'Western', 'FastFood', 'Dessert', 'Drinks', 'Other']
+    }],
+    address: {
+      street: String,
+      ward: String,
+      district: String,
+      city: String,
+      coordinates: {
+        lat: Number,
+        lng: Number
+      }
+    },
+    openingHours: {
+      monday: { open: String, close: String, isClosed: Boolean },
+      tuesday: { open: String, close: String, isClosed: Boolean },
+      wednesday: { open: String, close: String, isClosed: Boolean },
+      thursday: { open: String, close: String, isClosed: Boolean },
+      friday: { open: String, close: String, isClosed: Boolean },
+      saturday: { open: String, close: String, isClosed: Boolean },
+      sunday: { open: String, close: String, isClosed: Boolean }
+    },
+    images: [String],
+    logo: String,
+    rating: {
+      average: { type: Number, default: 0, min: 0, max: 5 },
+      count: { type: Number, default: 0 }
+    },
+    priceRange: {
+      type: String,
+      enum: ['$', '$$', '$$$', '$$$$']
+    },
+    isVerified: {
+      type: Boolean,
+      default: false
+    },
+    isAcceptingOrders: {
+      type: Boolean,
+      default: true
+    },
+    deliveryFee: {
+      type: Number,
+      default: 0
+    },
+    minOrderAmount: {
+      type: Number,
+      default: 0
+    }
   },
   isActive: {
     type: Boolean,
     default: true
-  },
-  restaurantId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Restaurant'
   }
 }, {
   timestamps: true

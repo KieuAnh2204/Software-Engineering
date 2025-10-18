@@ -1,0 +1,980 @@
+{
+	"info": {
+		"_postman_id": "foodfast-delivery-api",
+		"name": "🍔 FoodFast Delivery API",
+		"description": "Complete API for FoodFast Delivery - Food Delivery App\n\n**Setup:**\n1. Import collection\n2. Create environment: `base_url` = `http://localhost:3001`\n3. Run requests in order\n\n**Auto-saves token after login/register**",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3001",
+			"type": "default"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "default"
+		},
+		{
+			"key": "customer_token",
+			"value": "",
+			"type": "default"
+		},
+		{
+			"key": "restaurant_token",
+			"value": "",
+			"type": "default"
+		},
+		{
+			"key": "customer_id",
+			"value": "",
+			"type": "default"
+		},
+		{
+			"key": "restaurant_id",
+			"value": "",
+			"type": "default"
+		}
+	],
+	"item": [
+		{
+			"name": "User Service",
+			"item": [
+				{
+					"name": "Health Check",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Service is healthy\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"OK\");",
+									"    pm.expect(jsonData.service).to.eql(\"user-service\");",
+									"});",
+									"",
+									"console.log(\"✅ User Service is healthy and running!\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": ["{{base_url}}"],
+							"path": ["health"]
+						},
+						"description": "Check if User Service is running and healthy"
+					},
+					"response": []
+				},
+				{
+					"name": "Register Customer",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set(\"customer_token\", jsonData.data.token);",
+									"    pm.collectionVariables.set(\"customer_id\", jsonData.data.user._id);",
+									"    pm.collectionVariables.set(\"token\", jsonData.data.token);",
+									"    console.log(\"✅ Customer 1 created successfully!\");",
+									"    console.log(\"📝 Customer ID: \" + jsonData.data.user._id);",
+									"    console.log(\"🔑 Token saved to customer_token\");",
+									"} else if (pm.response.code === 400) {",
+									"    console.log(\"⚠️ Customer already exists - this is OK for testing\");",
+									"}",
+									"",
+									"pm.test(\"Customer created or already exists\", function () {",
+									"    pm.expect([201, 400]).to.include(pm.response.code);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"customer_test1\",\n  \"email\": \"customer1@foodfast.com\",\n  \"password\": \"customer123\",\n  \"fullName\": \"Nguyễn Văn A\",\n  \"phone\": \"+84901234567\",\n  \"role\": \"customer\",\n  \"customerProfile\": {\n    \"address\": {\n      \"street\": \"123 Lê Lợi\",\n      \"ward\": \"Phường Bến Nghé\",\n      \"district\": \"Quận 1\",\n      \"city\": \"Hồ Chí Minh\",\n      \"coordinates\": {\n        \"lat\": 10.7756,\n        \"lng\": 106.7019\n      }\n    },\n    \"defaultAddress\": \"123 Lê Lợi, Phường Bến Nghé, Quận 1, TP.HCM\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "register"]
+						},
+						"description": "Create test customer 1"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Customer 2",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    console.log(\"✅ Customer 2 created successfully!\");",
+									"} else if (pm.response.code === 400) {",
+									"    console.log(\"⚠️ Customer 2 already exists\");",
+									"}",
+									"",
+									"pm.test(\"Customer created or already exists\", function () {",
+									"    pm.expect([201, 400]).to.include(pm.response.code);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"customer_test2\",\n  \"email\": \"customer2@foodfast.com\",\n  \"password\": \"customer123\",\n  \"fullName\": \"Trần Thị B\",\n  \"phone\": \"+84903456789\",\n  \"role\": \"customer\",\n  \"customerProfile\": {\n    \"address\": {\n      \"street\": \"88 Đồng Khởi\",\n      \"ward\": \"Phường Bến Nghé\",\n      \"district\": \"Quận 1\",\n      \"city\": \"Hồ Chí Minh\",\n      \"coordinates\": {\n        \"lat\": 10.7734,\n        \"lng\": 106.7010\n      }\n    },\n    \"defaultAddress\": \"88 Đồng Khởi, Phường Bến Nghé, Quận 1, TP.HCM\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "register"]
+						},
+						"description": "Create test customer 2"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Restaurant - Phở 24",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set(\"restaurant_token\", jsonData.data.token);",
+									"    pm.collectionVariables.set(\"restaurant_id\", jsonData.data.user._id);",
+									"    console.log(\"✅ Phở 24 restaurant created!\");",
+									"    console.log(\"📝 Restaurant ID: \" + jsonData.data.user._id);",
+									"    console.log(\"🔑 Token saved to restaurant_token\");",
+									"} else if (pm.response.code === 400) {",
+									"    console.log(\"⚠️ Phở 24 already exists\");",
+									"}",
+									"",
+									"pm.test(\"Restaurant created or already exists\", function () {",
+									"    pm.expect([201, 400]).to.include(pm.response.code);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"restaurant_pho24\",\n  \"email\": \"pho24@restaurant.com\",\n  \"password\": \"restaurant123\",\n  \"fullName\": \"Phở 24 Quản Lý\",\n  \"phone\": \"+84902345678\",\n  \"role\": \"restaurant\",\n  \"restaurantProfile\": {\n    \"restaurantName\": \"Phở 24\",\n    \"description\": \"Chuỗi nhà hàng phở nổi tiếng với hơn 50 chi nhánh trên toàn quốc. Phở được nấu từ xương hầm 24 tiếng.\",\n    \"cuisineType\": [\"Vietnamese\"],\n    \"address\": {\n      \"street\": \"456 Nguyễn Huệ\",\n      \"ward\": \"Phường Bến Nghé\",\n      \"district\": \"Quận 1\",\n      \"city\": \"Hồ Chí Minh\",\n      \"coordinates\": {\n        \"lat\": 10.7731,\n        \"lng\": 106.7007\n      }\n    },\n    \"openingHours\": {\n      \"monday\": { \"open\": \"06:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"tuesday\": { \"open\": \"06:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"wednesday\": { \"open\": \"06:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"thursday\": { \"open\": \"06:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"friday\": { \"open\": \"06:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"saturday\": { \"open\": \"06:00\", \"close\": \"23:00\", \"isClosed\": false },\n      \"sunday\": { \"open\": \"06:00\", \"close\": \"23:00\", \"isClosed\": false }\n    },\n    \"priceRange\": \"$$\",\n    \"deliveryFee\": 15000,\n    \"minOrderAmount\": 50000,\n    \"isAcceptingOrders\": true\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "register"]
+						},
+						"description": "Create Phở 24 restaurant"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Restaurant - Burger King",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    console.log(\"✅ Burger King created!\");",
+									"} else if (pm.response.code === 400) {",
+									"    console.log(\"⚠️ Burger King already exists\");",
+									"}",
+									"",
+									"pm.test(\"Restaurant created or already exists\", function () {",
+									"    pm.expect([201, 400]).to.include(pm.response.code);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"restaurant_burgerking\",\n  \"email\": \"burgerking@restaurant.com\",\n  \"password\": \"restaurant123\",\n  \"fullName\": \"Burger King Manager\",\n  \"phone\": \"+84904567890\",\n  \"role\": \"restaurant\",\n  \"restaurantProfile\": {\n    \"restaurantName\": \"Burger King\",\n    \"description\": \"Fast food nổi tiếng thế giới với burger, gà rán và khoai tây chiên ngon tuyệt\",\n    \"cuisineType\": [\"FastFood\", \"Western\"],\n    \"address\": {\n      \"street\": \"200 Nguyễn Trãi\",\n      \"ward\": \"Phường Nguyễn Cư Trinh\",\n      \"district\": \"Quận 1\",\n      \"city\": \"Hồ Chí Minh\",\n      \"coordinates\": {\n        \"lat\": 10.7654,\n        \"lng\": 106.6881\n      }\n    },\n    \"openingHours\": {\n      \"monday\": { \"open\": \"08:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"tuesday\": { \"open\": \"08:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"wednesday\": { \"open\": \"08:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"thursday\": { \"open\": \"08:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"friday\": { \"open\": \"08:00\", \"close\": \"23:00\", \"isClosed\": false },\n      \"saturday\": { \"open\": \"08:00\", \"close\": \"23:00\", \"isClosed\": false },\n      \"sunday\": { \"open\": \"08:00\", \"close\": \"23:00\", \"isClosed\": false }\n    },\n    \"priceRange\": \"$$\",\n    \"deliveryFee\": 10000,\n    \"minOrderAmount\": 60000,\n    \"isAcceptingOrders\": true\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "register"]
+						},
+						"description": "Create Burger King restaurant"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Restaurant - Highlands Coffee",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    console.log(\"✅ Highlands Coffee created!\");",
+									"} else if (pm.response.code === 400) {",
+									"    console.log(\"⚠️ Highlands Coffee already exists\");",
+									"}",
+									"",
+									"pm.test(\"Restaurant created or already exists\", function () {",
+									"    pm.expect([201, 400]).to.include(pm.response.code);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"restaurant_highlands\",\n  \"email\": \"highlands@restaurant.com\",\n  \"password\": \"restaurant123\",\n  \"fullName\": \"Highlands Coffee Manager\",\n  \"phone\": \"+84905678901\",\n  \"role\": \"restaurant\",\n  \"restaurantProfile\": {\n    \"restaurantName\": \"Highlands Coffee\",\n    \"description\": \"Chuỗi cà phê Việt Nam với không gian hiện đại, cà phê ngon và bánh ngọt đa dạng\",\n    \"cuisineType\": [\"Drinks\", \"Dessert\"],\n    \"address\": {\n      \"street\": \"100 Lý Tự Trọng\",\n      \"ward\": \"Phường Bến Thành\",\n      \"district\": \"Quận 1\",\n      \"city\": \"Hồ Chí Minh\",\n      \"coordinates\": {\n        \"lat\": 10.7721,\n        \"lng\": 106.6984\n      }\n    },\n    \"openingHours\": {\n      \"monday\": { \"open\": \"07:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"tuesday\": { \"open\": \"07:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"wednesday\": { \"open\": \"07:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"thursday\": { \"open\": \"07:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"friday\": { \"open\": \"07:00\", \"close\": \"23:00\", \"isClosed\": false },\n      \"saturday\": { \"open\": \"07:00\", \"close\": \"23:00\", \"isClosed\": false },\n      \"sunday\": { \"open\": \"07:00\", \"close\": \"23:00\", \"isClosed\": false }\n    },\n    \"priceRange\": \"$$\",\n    \"deliveryFee\": 12000,\n    \"minOrderAmount\": 40000,\n    \"isAcceptingOrders\": true\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "register"]
+						},
+						"description": "Create Highlands Coffee restaurant"
+					},
+					"response": []
+				}
+			],
+			"description": "Run this folder first to create test customers and restaurants.\n\n**Creates:**\n- 2 Customers (customer_test1, customer_test2)\n- 3 Restaurants (Phở 24, Burger King, Highlands Coffee)\n\n**Auto-saves:**\n- customer_token\n- restaurant_token\n- customer_id\n- restaurant_id"
+		},
+		{
+			"name": "2. Customer Flow",
+			"item": [
+				{
+					"name": "Customer Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Login successful\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    pm.expect(jsonData.data.token).to.exist;",
+									"    pm.expect(jsonData.data.user.role).to.eql(\"customer\");",
+									"    ",
+									"    // Save token",
+									"    pm.collectionVariables.set(\"customer_token\", jsonData.data.token);",
+									"    pm.collectionVariables.set(\"token\", jsonData.data.token);",
+									"    pm.collectionVariables.set(\"customer_id\", jsonData.data.user._id);",
+									"    ",
+									"    console.log(\"✅ Customer logged in successfully!\");",
+									"    console.log(\"📝 Username: \" + jsonData.data.user.username);",
+									"    console.log(\"🔑 Token saved\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"customer_test1\",\n  \"password\": \"customer123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "login"]
+						},
+						"description": "Login as customer"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Customer Profile",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Profile retrieved successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    pm.expect(jsonData.data.role).to.eql(\"customer\");",
+									"    pm.expect(jsonData.data.customerProfile).to.exist;",
+									"    ",
+									"    console.log(\"✅ Customer profile retrieved!\");",
+									"    console.log(\"📝 Name: \" + jsonData.data.fullName);",
+									"    console.log(\"📍 Address: \" + jsonData.data.customerProfile.defaultAddress);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{customer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/profile",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "profile"]
+						},
+						"description": "Get customer profile using token"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Customer Profile",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Profile updated successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    console.log(\"✅ Customer profile updated!\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{customer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"Nguyễn Văn A (Updated)\",\n  \"phone\": \"+84909999999\",\n  \"customerProfile\": {\n    \"address\": {\n      \"street\": \"789 Hai Bà Trưng\",\n      \"ward\": \"Phường Bến Nghé\",\n      \"district\": \"Quận 1\",\n      \"city\": \"Hồ Chí Minh\"\n    },\n    \"defaultAddress\": \"789 Hai Bà Trưng, Phường Bến Nghé, Quận 1, TP.HCM\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/profile",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "profile"]
+						},
+						"description": "Update customer profile"
+					},
+					"response": []
+				},
+				{
+					"name": "Browse All Restaurants",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Restaurants list retrieved\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    pm.expect(jsonData.data).to.be.an('array');",
+									"    ",
+									"    console.log(\"✅ Found \" + jsonData.pagination.totalRestaurants + \" restaurants\");",
+									"    ",
+									"    jsonData.data.forEach(function(restaurant) {",
+									"        console.log(\"🍽️ \" + restaurant.restaurantProfile.restaurantName);",
+									"    });",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users/restaurants",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "restaurants"]
+						},
+						"description": "Customer browses all available restaurants"
+					},
+					"response": []
+				},
+				{
+					"name": "Search Vietnamese Restaurants",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Search results returned\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    console.log(\"✅ Found \" + jsonData.count + \" Vietnamese restaurants\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users/restaurants/search?cuisine=Vietnamese",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "restaurants", "search"],
+							"query": [
+								{
+									"key": "cuisine",
+									"value": "Vietnamese"
+								}
+							]
+						},
+						"description": "Search for Vietnamese cuisine restaurants"
+					},
+					"response": []
+				},
+				{
+					"name": "Search by City",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"City search results\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    console.log(\"✅ Found \" + jsonData.count + \" restaurants in Hồ Chí Minh\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users/restaurants/search?city=Hồ Chí Minh",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "restaurants", "search"],
+							"query": [
+								{
+									"key": "city",
+									"value": "Hồ Chí Minh"
+								}
+							]
+						},
+						"description": "Search restaurants by city"
+					},
+					"response": []
+				}
+			],
+			"description": "Customer user flow:\n1. Login\n2. View profile\n3. Update profile\n4. Browse restaurants\n5. Search restaurants"
+		},
+		{
+			"name": "3. Restaurant Flow",
+			"item": [
+				{
+					"name": "Restaurant Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Restaurant login successful\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    pm.expect(jsonData.data.user.role).to.eql(\"restaurant\");",
+									"    ",
+									"    pm.collectionVariables.set(\"restaurant_token\", jsonData.data.token);",
+									"    pm.collectionVariables.set(\"token\", jsonData.data.token);",
+									"    pm.collectionVariables.set(\"restaurant_id\", jsonData.data.user._id);",
+									"    ",
+									"    console.log(\"✅ Restaurant logged in!\");",
+									"    console.log(\"🍽️ Restaurant: \" + jsonData.data.user.restaurantProfile.restaurantName);",
+									"    console.log(\"🔑 Token saved to restaurant_token\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"pho24@restaurant.com\",\n  \"password\": \"restaurant123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "login"]
+						},
+						"description": "Login as restaurant owner"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Restaurant Profile",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Restaurant profile retrieved\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    pm.expect(jsonData.data.role).to.eql(\"restaurant\");",
+									"    pm.expect(jsonData.data.restaurantProfile).to.exist;",
+									"    ",
+									"    console.log(\"✅ Restaurant profile retrieved!\");",
+									"    console.log(\"🍽️ Name: \" + jsonData.data.restaurantProfile.restaurantName);",
+									"    console.log(\"📍 Address: \" + jsonData.data.restaurantProfile.address.street);",
+									"    console.log(\"💰 Delivery Fee: \" + jsonData.data.restaurantProfile.deliveryFee + \" VND\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{restaurant_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/profile",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "profile"]
+						},
+						"description": "Get restaurant owner profile"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Restaurant Info",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Restaurant info updated\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    console.log(\"✅ Restaurant info updated successfully!\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{restaurant_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"restaurantProfile\": {\n    \"description\": \"Phở 24 - Hương vị phở truyền thống Việt Nam. Xương hầm 24 tiếng, nước dùng ngọt thanh.\",\n    \"priceRange\": \"$$$\",\n    \"deliveryFee\": 20000,\n    \"minOrderAmount\": 80000,\n    \"isAcceptingOrders\": true,\n    \"openingHours\": {\n      \"monday\": { \"open\": \"07:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"tuesday\": { \"open\": \"07:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"wednesday\": { \"open\": \"07:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"thursday\": { \"open\": \"07:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"friday\": { \"open\": \"07:00\", \"close\": \"23:00\", \"isClosed\": false },\n      \"saturday\": { \"open\": \"07:00\", \"close\": \"23:00\", \"isClosed\": false },\n      \"sunday\": { \"open\": \"07:00\", \"close\": \"23:00\", \"isClosed\": false }\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/profile",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "profile"]
+						},
+						"description": "Update restaurant information"
+					},
+					"response": []
+				},
+				{
+					"name": "Toggle Accepting Orders - Close",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Status updated\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    console.log(\"✅ Restaurant status updated - Now CLOSED for orders\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{restaurant_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"isAcceptingOrders\": false\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/users/restaurants/{{restaurant_id}}/status",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "restaurants", "{{restaurant_id}}", "status"]
+						},
+						"description": "Close restaurant for orders"
+					},
+					"response": []
+				},
+				{
+					"name": "Toggle Accepting Orders - Open",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Status updated\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    console.log(\"✅ Restaurant status updated - Now OPEN for orders\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{restaurant_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"isAcceptingOrders\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/users/restaurants/{{restaurant_id}}/status",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "restaurants", "{{restaurant_id}}", "status"]
+						},
+						"description": "Open restaurant for orders"
+					},
+					"response": []
+				}
+			],
+			"description": "Restaurant owner flow:\n1. Login\n2. View profile\n3. Update restaurant info\n4. Toggle accepting orders status"
+		},
+		{
+			"name": "4. Public APIs",
+			"item": [
+				{
+					"name": "Get All Restaurants (No Auth)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Restaurants retrieved without auth\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    pm.expect(jsonData.data).to.be.an('array');",
+									"    ",
+									"    console.log(\"✅ Public access working!\");",
+									"    console.log(\"📊 Total restaurants: \" + jsonData.pagination.totalRestaurants);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users/restaurants?page=1&limit=10",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "restaurants"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Public endpoint - no authentication required"
+					},
+					"response": []
+				},
+				{
+					"name": "Filter by Price Range",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users/restaurants?priceRange=$$",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "restaurants"],
+							"query": [
+								{
+									"key": "priceRange",
+									"value": "$$"
+								}
+							]
+						},
+						"description": "Filter restaurants by price range"
+					},
+					"response": []
+				},
+				{
+					"name": "Filter by Cuisine Type",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users/restaurants?cuisineType=Vietnamese",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "restaurants"],
+							"query": [
+								{
+									"key": "cuisineType",
+									"value": "Vietnamese"
+								}
+							]
+						},
+						"description": "Filter by cuisine type"
+					},
+					"response": []
+				},
+				{
+					"name": "Search by Restaurant Name",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users/restaurants/search?q=Phở",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "restaurants", "search"],
+							"query": [
+								{
+									"key": "q",
+									"value": "Phở"
+								}
+							]
+						},
+						"description": "Search restaurants by name"
+					},
+					"response": []
+				},
+				{
+					"name": "Combined Filters",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users/restaurants/search?cuisine=Vietnamese&city=Hồ Chí Minh&priceRange=$$",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "restaurants", "search"],
+							"query": [
+								{
+									"key": "cuisine",
+									"value": "Vietnamese"
+								},
+								{
+									"key": "city",
+									"value": "Hồ Chí Minh"
+								},
+								{
+									"key": "priceRange",
+									"value": "$$"
+								}
+							]
+						},
+						"description": "Combine multiple filters"
+					},
+					"response": []
+				}
+			],
+			"description": "Public APIs that don't require authentication:\n- Get all restaurants\n- Search & filter restaurants\n- View restaurant details"
+		}
+	]
+}

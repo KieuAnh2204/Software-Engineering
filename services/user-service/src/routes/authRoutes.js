@@ -10,7 +10,8 @@ const registerValidation = [
   body('username').trim().isLength({ min: 3, max: 30 }).withMessage('Username must be 3-30 characters'),
   body('email').isEmail().normalizeEmail().withMessage('Invalid email'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  body('role').optional().isIn(['user', 'owner', 'admin']).withMessage('Invalid role')
+  body('phone').notEmpty().withMessage('Phone number is required'),
+  body('role').optional().isIn(['customer', 'restaurant', 'admin']).withMessage('Invalid role')
 ];
 
 const loginValidation = [

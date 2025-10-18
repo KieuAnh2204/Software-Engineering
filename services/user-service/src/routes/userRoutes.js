@@ -3,13 +3,25 @@ import {
   getAllUsers, 
   getUserById, 
   updateUser, 
-  deleteUser 
+  deleteUser,
+  getAllRestaurants,
+  getRestaurantById,
+  searchRestaurants,
+  updateRestaurantStatus
 } from '../controllers/userController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// All routes require authentication
+// Public routes - không cần authentication
+router.get('/restaurants', getAllRestaurants);
+router.get('/restaurants/search', searchRestaurants);
+router.get('/restaurants/:id', getRestaurantById);
+
+// Protected restaurant routes
+router.put('/restaurants/:id/status', authenticate, updateRestaurantStatus);
+
+// All other routes require authentication
 router.use(authenticate);
 
 // Admin only routes
