@@ -1,69 +1,43 @@
-const mongoose = require('mongoose');
+const db = require('../config/db');
 
-const paymentSchema = new mongoose.Schema({
-  orderId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: [true, 'Order ID is required'],
-    unique: true
-  },
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: [true, 'User ID is required']
-  },
-  amount: {
-    type: Number,
-    required: [true, 'Amount is required'],
-    min: [0, 'Amount cannot be negative']
-  },
-  currency: {
-    type: String,
-    default: 'USD',
-    uppercase: true
-  },
-  paymentMethod: {
-    type: String,
-    enum: ['credit_card', 'debit_card', 'paypal', 'cash', 'wallet'],
-    required: [true, 'Payment method is required']
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'processing', 'completed', 'failed', 'refunded'],
-    default: 'pending'
-  },
-  stripePaymentId: {
-    type: String,
-    default: null
-  },
-  stripeCustomerId: {
-    type: String,
-    default: null
-  },
-  refundId: {
-    type: String,
-    default: null
-  },
-  refundAmount: {
-    type: Number,
-    default: 0
-  },
-  refundReason: {
-    type: String,
-    maxlength: [500, 'Refund reason cannot exceed 500 characters']
-  },
-  failureReason: {
-    type: String,
-    maxlength: [500, 'Failure reason cannot exceed 500 characters']
-  },
-  metadata: {
-    type: Map,
-    of: String
+const createPayment = async ({ order_id, amount, status='pending', order_no }) => {
+  const res = await db.query(
+    `INSERT INTO payment (order_id, amount, status, order_no)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [order_id, amount, status, order_no]
+  );
+  return res.rows[0];
+};
+
+const updatePaymentByOrderNo = async (order_no, fields = {}) => {
+  const setClauses = [];
+  const values = [];
+  let i = 1;
+  for (const key in fields) {
+    setClauses.push(`${key} = $${i}`);
+    values.push(fields[key]);
+    i++;
   }
-}, {
-  timestamps: true
-});
+  if (setClauses.length === 0) return null;
+  values.push(order_no);
+  const q = `UPDATE payment SET ${setClauses.join(', ')}, updated_at = now() WHERE order_no = $${i} RETURNING *`;
+  const res = await db.query(q, values);
+  return res.rows[0];
+};
 
-// Index for faster queries
-paymentSchema.index({ orderId: 1 });
-paymentSchema.index({ userId: 1, createdAt: -1 });
+const getPaymentByOrderNo = async (order_no) => {
+  const res = await db.query('SELECT * FROM payment WHERE order_no = $1', [order_no]);
+  return res.rows[0];
+};
 
-module.exports = mongoose.model('Payment', paymentSchema);
+const getPaymentById = async (payment_id) => {
+  const res = await db.query('SELECT * FROM payment WHERE payment_id = $1', [payment_id]);
+  return res.rows[0];
+};
+
+module.exports = {
+  createPayment,
+  updatePaymentByOrderNo,
+  getPaymentByOrderNo,
+  getPaymentById
+};

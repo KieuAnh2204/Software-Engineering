@@ -1,40 +1,16 @@
+require('dotenv').config();
 const express = require('express');
-const dotenv = require('dotenv');
-const cors = require('cors');
-const helmet = require('helmet');
-const connectDB = require('./config/database');
+const bodyParser = require('body-parser');
+
 const paymentRoutes = require('./routes/paymentRoutes');
-const errorHandler = require('./middleware/errorHandler');
-
-// Load environment variables
-dotenv.config();
-
-// Connect to MongoDB
-connectDB();
 
 const app = express();
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// Middleware
-app.use(helmet());
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Health check
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', service: 'payment-service' });
-});
-
-// Routes
 app.use('/api/payments', paymentRoutes);
 
-// Error handling
-app.use(errorHandler);
-
-const PORT = process.env.PORT || 3004;
-
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Payment Service running on port ${PORT}`);
+  console.log(`Payment service listening on ${PORT}`);
 });
-
-module.exports = app;
