@@ -1,0 +1,387 @@
+{
+	"info": {
+		"_postman_id": "foodfast-delivery-api",
+		"name": "🍔 FoodFast Delivery API",
+		"description": "Complete API for FoodFast Delivery App\n\n**Quick Setup:**\n1. Import this collection\n2. Create environment with `base_url` = `http://localhost:3001`\n3. Run 'Test Data' folder first to create test users\n4. Test other endpoints\n\n**Features:**\n- Auto-saves tokens after login\n- Customer & Restaurant flows\n- Search & filter restaurants",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3001",
+			"type": "default"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "default"
+		}
+	],
+	"item": [
+		{
+			"name": "User Service",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": ["{{base_url}}"],
+							"path": ["health"]
+						}
+					}
+				},
+				{
+					"name": "Register Customer",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set('token', jsonData.data.token);",
+									"    console.log('✅ Customer registered! Token saved.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"customer1\",\n  \"email\": \"customer1@foodfast.com\",\n  \"password\": \"customer123\",\n  \"fullName\": \"Nguyễn Văn A\",\n  \"phone\": \"+84901234567\",\n  \"role\": \"customer\",\n  \"customerProfile\": {\n    \"address\": {\n      \"street\": \"123 Lê Lợi\",\n      \"ward\": \"Phường Bến Nghé\",\n      \"district\": \"Quận 1\",\n      \"city\": \"Hồ Chí Minh\"\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "register"]
+						}
+					}
+				},
+				{
+					"name": "Register Restaurant",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set('token', jsonData.data.token);",
+									"    console.log('✅ Restaurant registered! Token saved.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"restaurant_pho24\",\n  \"email\": \"pho24@restaurant.com\",\n  \"password\": \"restaurant123\",\n  \"fullName\": \"Phở 24 Manager\",\n  \"phone\": \"+84902345678\",\n  \"role\": \"restaurant\",\n  \"restaurantProfile\": {\n    \"restaurantName\": \"Phở 24\",\n    \"description\": \"Phở truyền thống Việt Nam\",\n    \"cuisineType\": [\"Vietnamese\"],\n    \"address\": {\n      \"street\": \"456 Nguyễn Huệ\",\n      \"ward\": \"Phường Bến Nghé\",\n      \"district\": \"Quận 1\",\n      \"city\": \"Hồ Chí Minh\"\n    },\n    \"openingHours\": {\n      \"monday\": { \"open\": \"06:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"tuesday\": { \"open\": \"06:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"wednesday\": { \"open\": \"06:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"thursday\": { \"open\": \"06:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"friday\": { \"open\": \"06:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"saturday\": { \"open\": \"06:00\", \"close\": \"23:00\", \"isClosed\": false },\n      \"sunday\": { \"open\": \"06:00\", \"close\": \"23:00\", \"isClosed\": false }\n    },\n    \"priceRange\": \"$$\",\n    \"deliveryFee\": 15000,\n    \"minOrderAmount\": 50000\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "register"]
+						}
+					}
+				},
+				{
+					"name": "Login Customer",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set('token', jsonData.data.token);",
+									"    console.log('✅ Customer logged in! Token saved.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"customer1\",\n  \"password\": \"customer123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "Login Restaurant",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set('token', jsonData.data.token);",
+									"    console.log('✅ Restaurant logged in! Token saved.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"pho24@restaurant.com\",\n  \"password\": \"restaurant123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "Get Profile",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/profile",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "profile"]
+						}
+					}
+				},
+				{
+					"name": "Update Customer Profile",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"Nguyễn Văn A (Updated)\",\n  \"phone\": \"+84909999999\",\n  \"customerProfile\": {\n    \"address\": {\n      \"street\": \"789 Hai Bà Trưng\",\n      \"ward\": \"Phường Bến Nghé\",\n      \"district\": \"Quận 1\",\n      \"city\": \"Hồ Chí Minh\"\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/profile",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "profile"]
+						}
+					}
+				},
+				{
+					"name": "Update Restaurant Profile",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"restaurantProfile\": {\n    \"description\": \"Phở 24 - Hương vị phở truyền thống\",\n    \"priceRange\": \"$$$\",\n    \"deliveryFee\": 20000,\n    \"minOrderAmount\": 80000\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/profile",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "profile"]
+						}
+					}
+				},
+				{
+					"name": "Get All Restaurants",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users/restaurants",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "restaurants"]
+						}
+					}
+				},
+				{
+					"name": "Get Restaurant by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users/restaurants/:id",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "restaurants", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "RESTAURANT_ID"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Search Restaurants",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users/restaurants/search?cuisine=Vietnamese&city=Hồ Chí Minh",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "restaurants", "search"],
+							"query": [
+								{
+									"key": "cuisine",
+									"value": "Vietnamese"
+								},
+								{
+									"key": "city",
+									"value": "Hồ Chí Minh"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Test Data",
+			"item": [
+				{
+					"name": "Create Customer 2",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"customer2\",\n  \"email\": \"customer2@foodfast.com\",\n  \"password\": \"customer123\",\n  \"fullName\": \"Trần Thị B\",\n  \"phone\": \"+84903456789\",\n  \"role\": \"customer\",\n  \"customerProfile\": {\n    \"address\": {\n      \"street\": \"88 Đồng Khởi\",\n      \"ward\": \"Phường Bến Nghé\",\n      \"district\": \"Quận 1\",\n      \"city\": \"Hồ Chí Minh\"\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "register"]
+						}
+					}
+				},
+				{
+					"name": "Create Restaurant - Burger King",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"restaurant_burgerking\",\n  \"email\": \"burgerking@restaurant.com\",\n  \"password\": \"restaurant123\",\n  \"fullName\": \"Burger King Manager\",\n  \"phone\": \"+84904567890\",\n  \"role\": \"restaurant\",\n  \"restaurantProfile\": {\n    \"restaurantName\": \"Burger King\",\n    \"description\": \"Fast food nổi tiếng thế giới\",\n    \"cuisineType\": [\"FastFood\", \"Western\"],\n    \"address\": {\n      \"street\": \"200 Nguyễn Trãi\",\n      \"ward\": \"Phường Nguyễn Cư Trinh\",\n      \"district\": \"Quận 1\",\n      \"city\": \"Hồ Chí Minh\"\n    },\n    \"openingHours\": {\n      \"monday\": { \"open\": \"08:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"tuesday\": { \"open\": \"08:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"wednesday\": { \"open\": \"08:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"thursday\": { \"open\": \"08:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"friday\": { \"open\": \"08:00\", \"close\": \"23:00\", \"isClosed\": false },\n      \"saturday\": { \"open\": \"08:00\", \"close\": \"23:00\", \"isClosed\": false },\n      \"sunday\": { \"open\": \"08:00\", \"close\": \"23:00\", \"isClosed\": false }\n    },\n    \"priceRange\": \"$$\",\n    \"deliveryFee\": 10000,\n    \"minOrderAmount\": 60000\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "register"]
+						}
+					}
+				},
+				{
+					"name": "Create Restaurant - Highlands Coffee",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"restaurant_highlands\",\n  \"email\": \"highlands@restaurant.com\",\n  \"password\": \"restaurant123\",\n  \"fullName\": \"Highlands Coffee Manager\",\n  \"phone\": \"+84905678901\",\n  \"role\": \"restaurant\",\n  \"restaurantProfile\": {\n    \"restaurantName\": \"Highlands Coffee\",\n    \"description\": \"Chuỗi cà phê Việt Nam\",\n    \"cuisineType\": [\"Drinks\", \"Dessert\"],\n    \"address\": {\n      \"street\": \"100 Lý Tự Trọng\",\n      \"ward\": \"Phường Bến Thành\",\n      \"district\": \"Quận 1\",\n      \"city\": \"Hồ Chí Minh\"\n    },\n    \"openingHours\": {\n      \"monday\": { \"open\": \"07:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"tuesday\": { \"open\": \"07:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"wednesday\": { \"open\": \"07:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"thursday\": { \"open\": \"07:00\", \"close\": \"22:00\", \"isClosed\": false },\n      \"friday\": { \"open\": \"07:00\", \"close\": \"23:00\", \"isClosed\": false },\n      \"saturday\": { \"open\": \"07:00\", \"close\": \"23:00\", \"isClosed\": false },\n      \"sunday\": { \"open\": \"07:00\", \"close\": \"23:00\", \"isClosed\": false }\n    },\n    \"priceRange\": \"$$\",\n    \"deliveryFee\": 12000,\n    \"minOrderAmount\": 40000\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "register"]
+						}
+					}
+				}
+			]
+		}
+	]
+}
