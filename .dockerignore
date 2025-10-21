@@ -1,3 +1,0 @@
-# Add to services/.gitignore
-.env.docker
-docker-compose.override.yml
