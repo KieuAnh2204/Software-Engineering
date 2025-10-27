@@ -3,19 +3,8 @@ import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
 
 // Generate JWT token
-const generateToken = (user) => {
-  const payload = {
-    id: user._id,
-    role: user.role,
-    email: user.email
-  };
-  
-  // Add restaurantId for restaurant owners
-  if (user.role === 'restaurant' && user.restaurantProfile?.restaurantId) {
-    payload.restaurantId = user.restaurantProfile.restaurantId;
-  }
-  
-  return jwt.sign(payload, process.env.JWT_SECRET, {
+const generateToken = (userId) => {
+  return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRE || '7d'
   });
 };
@@ -45,24 +34,22 @@ export const register = async (req, res, next) => {
       username,
       email,
       password,
-      role: role || 'customer', // Default to customer
+      role: role || 'user',
       fullName,
       phone
     });
 
-    const token = generateToken(user);
+    const token = generateToken(user._id);
 
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
       data: {
         user: {
           id: user._id,
           username: user.username,
           email: user.email,
           role: user.role,
-          fullName: user.fullName,
-          phone: user.phone
+          fullName: user.fullName
         },
         token
       }
@@ -87,72 +74,32 @@ export const login = async (req, res, next) => {
     // Find user by email or username
     const query = email ? { email } : { username };
     const user = await User.findOne(query).select('+password');
-    
     if (!user) {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Invalid credentials' 
-      });
-    }
-
-    // Check if account is deleted
-    if (user.isDeleted) {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Account has been deleted' 
-      });
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     // Check if user is active
     if (!user.isActive) {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Account is deactivated. Please contact support.' 
-      });
-    }
-
-    // Check if account is locked
-    if (user.isLocked) {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Account is locked due to too many failed login attempts. Please try again later.' 
-      });
+      return res.status(401).json({ message: 'Account is deactivated' });
     }
 
     // Check password
     const isPasswordMatch = await user.comparePassword(password);
-    
     if (!isPasswordMatch) {
-      // Increment login attempts
-      await user.incLoginAttempts();
-      
-      return res.status(401).json({ 
-        success: false,
-        message: 'Invalid credentials' 
-      });
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Reset login attempts on successful login
-    await user.resetLoginAttempts();
-
-    // Update last login time
-    user.lastLogin = Date.now();
-    await user.save({ validateBeforeSave: false });
-
-    const token = generateToken(user);
+    const token = generateToken(user._id);
 
     res.status(200).json({
       success: true,
-      message: 'Login successful',
       data: {
         user: {
           id: user._id,
           username: user.username,
           email: user.email,
           role: user.role,
-          fullName: user.fullName,
-          phone: user.phone,
-          restaurantId: user.role === 'restaurant' ? user.restaurantProfile?.restaurantId : undefined
+          fullName: user.fullName
         },
         token
       }
