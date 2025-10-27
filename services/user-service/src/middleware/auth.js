@@ -1,8 +1,8 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
-// Verify JWT token
-export const authenticate = async (req, res, next) => {
+// Verify JWT token (alias: authenticate)
+export const protect = async (req, res, next) => {
   try {
     let token;
 
@@ -11,7 +11,10 @@ export const authenticate = async (req, res, next) => {
     }
 
     if (!token) {
-      return res.status(401).json({ message: 'Not authorized, no token' });
+      return res.status(401).json({ 
+        success: false,
+        message: 'Not authorized, no token provided' 
+      });
     }
 
     // Verify token
@@ -20,32 +23,78 @@ export const authenticate = async (req, res, next) => {
     // Get user from token
     const user = await User.findById(decoded.id);
 
-    if (!user || !user.isActive) {
-      return res.status(401).json({ message: 'User not found or inactive' });
+    if (!user) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'User not found' 
+      });
     }
 
-    req.user = {
-      id: user._id,
-      username: user.username,
-      email: user.email,
-      role: user.role
-    };
+    if (user.isDeleted) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Account has been deleted' 
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Account is inactive' 
+      });
+    }
+
+    // Attach user to request
+    req.user = user;
 
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);
-    res.status(401).json({ message: 'Not authorized, token failed' });
+    
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid token' 
+      });
+    }
+    
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Token expired' 
+      });
+    }
+    
+    res.status(401).json({ 
+      success: false,
+      message: 'Not authorized' 
+    });
   }
 };
 
+// Alias for backward compatibility
+export const authenticate = protect;
+
 // Check user roles
-export const authorize = (...roles) => {
+export const restrictTo = (...roles) => {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ 
-        message: `Role '${req.user.role}' is not authorized to access this route` 
+    if (!req.user) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Authentication required' 
       });
     }
+
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({ 
+        success: false,
+        message: `Access denied. Required role: ${roles.join(' or ')}` 
+      });
+    }
+    
     next();
   };
 };
+
+// Alias for backward compatibility
+export const authorize = restrictTo;
