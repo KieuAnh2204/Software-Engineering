@@ -1,0 +1,622 @@
+{
+  "info": {
+    "name": "Flow 1: Restaurant Registration & Menu Management",
+    "description": "Luồng đăng ký nhà hàng và quản lý món ăn\n\n**Hỗ trợ 2 kịch bản:**\n- 🏪 Quán đơn: Không cần tạo Brand (tự động)\n- 🏢 Chuỗi: Tạo Brand trước, sau đó thêm nhiều chi nhánh",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url_user",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "base_url_product",
+      "value": "http://localhost:3003",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "brand_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "restaurant_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "category_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "dish_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🏪 Kịch bản 1: Quán đơn (Simple)",
+      "item": [
+        {
+          "name": "1. Đăng ký tài khoản",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Lưu token và user_id vào environment",
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('auth_token', response.data.token);",
+                  "    pm.collectionVariables.set('user_id', response.data.user.id);",
+                  "    pm.test('✅ Đăng ký thành công', function() {",
+                  "        pm.expect(response.success).to.be.true;",
+                  "    });",
+                  "    console.log('🔑 Token:', response.data.token);",
+                  "    console.log('👤 User ID:', response.data.user.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"quan_pho_ba_lan\",\n  \"email\": \"balan@example.com\",\n  \"password\": \"123456\",\n  \"fullName\": \"Bà Lan\",\n  \"phone\": \"0901234567\",\n  \"role\": \"BRAND_MANAGER\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_user}}/api/auth/register",
+              "host": ["{{base_url_user}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Đăng ký tài khoản với role BRAND_MANAGER"
+          },
+          "response": []
+        },
+        {
+          "name": "2. Tạo nhà hàng (KHÔNG gửi brandId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Lưu restaurant_id và brand_id (tự động tạo)",
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('restaurant_id', response.data._id);",
+                  "    pm.collectionVariables.set('brand_id', response.data.brandId._id);",
+                  "    pm.test('✅ Nhà hàng tạo thành công', function() {",
+                  "        pm.expect(response.success).to.be.true;",
+                  "    });",
+                  "    pm.test('✅ Brand tự động tạo', function() {",
+                  "        pm.expect(response.note).to.include('Auto-created');",
+                  "    });",
+                  "    console.log('🏪 Restaurant ID:', response.data._id);",
+                  "    console.log('🏢 Brand ID (auto):', response.data.brandId._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Quán Phở Bà Lan\",\n  \"address\": {\n    \"street\": \"45 Lê Văn Sỹ\",\n    \"ward\": \"Phường 12\",\n    \"district\": \"Quận 3\",\n    \"city\": \"Hồ Chí Minh\"\n  },\n  \"phone\": \"0901234567\",\n  \"email\": \"balan@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_user}}/api/restaurants",
+              "host": ["{{base_url_user}}"],
+              "path": ["api", "restaurants"]
+            },
+            "description": "⚠️ KHÔNG gửi brandId → Hệ thống tự động tạo Brand"
+          },
+          "response": []
+        },
+        {
+          "name": "3. Tạo danh mục món ăn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('category_id', response.data._id);",
+                  "    pm.test('✅ Category tạo thành công', function() {",
+                  "        pm.expect(response.success).to.be.true;",
+                  "    });",
+                  "    console.log('📂 Category ID:', response.data._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Phở\",\n  \"description\": \"Các loại phở truyền thống\",\n  \"restaurantId\": \"{{restaurant_id}}\",\n  \"displayOrder\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url_product}}/api/categories",
+              "host": ["{{base_url_product}}"],
+              "path": ["api", "categories"]
+            },
+            "description": "Product Service sẽ gọi User Service để xác thực quyền"
+          },
+          "response": []
+        },
+        {
+          "name": "4. Thêm món ăn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('dish_id', response.data._id);",
+                  "    pm.test('✅ Món ăn tạo thành công', function() {",
+                  "        pm.expect(response.success).to.be.true;",
+                  "    });",
+                  "    console.log('🍜 Dish ID:', response.data._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Phở Tái\",\n  \"description\": \"Phở bò tái chín đặc biệt\",\n  \"price\": 50000,\n  \"categoryId\": \"{{category_id}}\",\n  \"restaurantId\": \"{{restaurant_id}}\",\n  \"images\": [\"https://example.com/pho-tai.jpg\"],\n  \"preparationTime\": 15,\n  \"unit\": \"bowl\",\n  \"tags\": [\"phở\", \"bò\", \"tái\"],\n  \"isAvailable\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url_product}}/api/dishes",
+              "host": ["{{base_url_product}}"],
+              "path": ["api", "dishes"]
+            },
+            "description": "Thêm món Phở Tái vào danh mục"
+          },
+          "response": []
+        }
+      ],
+      "description": "Kịch bản đơn giản: Không cần tạo Brand thủ công"
+    },
+    {
+      "name": "🏢 Kịch bản 2: Chuỗi nhà hàng (Chain)",
+      "item": [
+        {
+          "name": "1. Đăng ký tài khoản",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('auth_token', response.data.token);",
+                  "    pm.collectionVariables.set('user_id', response.data.user.id);",
+                  "    pm.test('✅ Đăng ký thành công', function() {",
+                  "        pm.expect(response.success).to.be.true;",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"baA\",\n  \"email\": \"baA@phoA.com\",\n  \"password\": \"123456\",\n  \"fullName\": \"Bà A\",\n  \"phone\": \"0901234567\",\n  \"role\": \"BRAND_MANAGER\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_user}}/api/auth/register",
+              "host": ["{{base_url_user}}"],
+              "path": ["api", "auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. Tạo Brand (Thương hiệu)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('brand_id', response.data._id);",
+                  "    pm.test('✅ Brand tạo thành công', function() {",
+                  "        pm.expect(response.success).to.be.true;",
+                  "    });",
+                  "    console.log('🏢 Brand ID:', response.data._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Phở A\",\n  \"description\": \"Chuỗi nhà hàng phở truyền thống Hà Nội\",\n  \"logo\": \"https://example.com/logo-pho-a.png\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_user}}/api/brands",
+              "host": ["{{base_url_user}}"],
+              "path": ["api", "brands"]
+            },
+            "description": "Tạo thương hiệu trước khi tạo chi nhánh"
+          },
+          "response": []
+        },
+        {
+          "name": "3. Tạo chi nhánh 1 (Q1)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('restaurant_id', response.data._id);",
+                  "    pm.test('✅ Chi nhánh 1 tạo thành công', function() {",
+                  "        pm.expect(response.success).to.be.true;",
+                  "    });",
+                  "    console.log('🏪 Restaurant ID:', response.data._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Phở A - Quận 1\",\n  \"brandId\": \"{{brand_id}}\",\n  \"address\": {\n    \"street\": \"123 Nguyễn Huệ\",\n    \"ward\": \"Phường Bến Nghé\",\n    \"district\": \"Quận 1\",\n    \"city\": \"Hồ Chí Minh\"\n  },\n  \"phone\": \"0281234567\",\n  \"email\": \"q1@phoA.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_user}}/api/restaurants",
+              "host": ["{{base_url_user}}"],
+              "path": ["api", "restaurants"]
+            },
+            "description": "✅ CÓ gửi brandId → Gắn vào Brand đã tạo"
+          },
+          "response": []
+        },
+        {
+          "name": "4. Tạo chi nhánh 2 (Q3)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Phở A - Quận 3\",\n  \"brandId\": \"{{brand_id}}\",\n  \"address\": {\n    \"street\": \"456 Lê Văn Sỹ\",\n    \"ward\": \"Phường 12\",\n    \"district\": \"Quận 3\",\n    \"city\": \"Hồ Chí Minh\"\n  },\n  \"phone\": \"0283456789\",\n  \"email\": \"q3@phoA.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_user}}/api/restaurants",
+              "host": ["{{base_url_user}}"],
+              "path": ["api", "restaurants"]
+            },
+            "description": "Tạo chi nhánh thứ 2 với cùng brandId"
+          },
+          "response": []
+        },
+        {
+          "name": "5. Thêm danh mục",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('category_id', response.data._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Phở\",\n  \"description\": \"Các loại phở truyền thống\",\n  \"restaurantId\": \"{{restaurant_id}}\",\n  \"displayOrder\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url_product}}/api/categories",
+              "host": ["{{base_url_product}}"],
+              "path": ["api", "categories"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "6. Thêm món ăn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Phở Tái\",\n  \"description\": \"Phở bò tái chín đặc biệt\",\n  \"price\": 50000,\n  \"categoryId\": \"{{category_id}}\",\n  \"restaurantId\": \"{{restaurant_id}}\",\n  \"preparationTime\": 15,\n  \"isAvailable\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url_product}}/api/dishes",
+              "host": ["{{base_url_product}}"],
+              "path": ["api", "dishes"]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Kịch bản chuỗi: Tạo Brand trước, sau đó thêm nhiều chi nhánh"
+    },
+    {
+      "name": "🔍 Query & Management",
+      "item": [
+        {
+          "name": "Lấy danh sách Brands của user",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url_user}}/api/brands",
+              "host": ["{{base_url_user}}"],
+              "path": ["api", "brands"]
+            },
+            "description": "Lấy tất cả brands mà user sở hữu"
+          },
+          "response": []
+        },
+        {
+          "name": "Lấy chi nhánh theo Brand",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_user}}/api/restaurants?brandId={{brand_id}}",
+              "host": ["{{base_url_user}}"],
+              "path": ["api", "restaurants"],
+              "query": [
+                {
+                  "key": "brandId",
+                  "value": "{{brand_id}}"
+                }
+              ]
+            },
+            "description": "Lấy tất cả restaurants thuộc 1 brand"
+          },
+          "response": []
+        },
+        {
+          "name": "Lấy danh mục theo Restaurant",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_product}}/api/categories?restaurantId={{restaurant_id}}",
+              "host": ["{{base_url_product}}"],
+              "path": ["api", "categories"],
+              "query": [
+                {
+                  "key": "restaurantId",
+                  "value": "{{restaurant_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Lấy món ăn theo Restaurant",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_product}}/api/dishes?restaurantId={{restaurant_id}}",
+              "host": ["{{base_url_product}}"],
+              "path": ["api", "dishes"],
+              "query": [
+                {
+                  "key": "restaurantId",
+                  "value": "{{restaurant_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Lấy món ăn theo Category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_product}}/api/dishes?categoryId={{category_id}}",
+              "host": ["{{base_url_product}}"],
+              "path": ["api", "dishes"],
+              "query": [
+                {
+                  "key": "categoryId",
+                  "value": "{{category_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Tìm kiếm món ăn",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_product}}/api/dishes/search?keyword=phở&restaurantId={{restaurant_id}}",
+              "host": ["{{base_url_product}}"],
+              "path": ["api", "dishes", "search"],
+              "query": [
+                {
+                  "key": "keyword",
+                  "value": "phở"
+                },
+                {
+                  "key": "restaurantId",
+                  "value": "{{restaurant_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Các API query và quản lý dữ liệu"
+    },
+    {
+      "name": "🔧 Internal API (Testing)",
+      "item": [
+        {
+          "name": "Check Restaurant Ownership",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_user}}/api/restaurants/{{restaurant_id}}/check-owner?user_id={{user_id}}",
+              "host": ["{{base_url_user}}"],
+              "path": ["api", "restaurants", "{{restaurant_id}}", "check-owner"],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                }
+              ]
+            },
+            "description": "API nội bộ để Product Service kiểm tra quyền sở hữu"
+          },
+          "response": []
+        }
+      ],
+      "description": "API nội bộ giữa các services (không cần auth token)"
+    }
+  ]
+}

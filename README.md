@@ -401,6 +401,11 @@ Frontend (http://localhost:5173)
 
 ## 📚 Documentation
 
+### 🏪 Restaurant Flow (Luồng Chủ Nhà Hàng)
+- **[QUICK_START_RESTAURANT.md](QUICK_START_RESTAURANT.md)** ⚡ - Đăng ký nhà hàng trong 2 bước
+- **[FLOW_1_BRAND_MANAGER_README.md](FLOW_1_BRAND_MANAGER_README.md)** 📖 - Tài liệu đầy đủ
+- **[FLOW_1_DIAGRAM.md](FLOW_1_DIAGRAM.md)** 🎨 - Sơ đồ luồng và database
+
 ### Setup Guides
 - **[START_SERVICES_GUIDE.md](START_SERVICES_GUIDE.md)** - Hướng dẫn khởi động services
 - **[DOCKER_MONGODB_SETUP.md](DOCKER_MONGODB_SETUP.md)** - Setup MongoDB Atlas
@@ -412,6 +417,8 @@ Frontend (http://localhost:5173)
 - **[PRODUCT_SERVICE_IMPLEMENTATION.md](PRODUCT_SERVICE_IMPLEMENTATION.md)** - Implementation details
 
 ### Testing Guides
+- **[POSTMAN_FLOW1_GUIDE.md](POSTMAN_FLOW1_GUIDE.md)** 📮 - Test Flow 1 với Postman
+- **[Flow1_Restaurant_Menu.postman_collection.json](Flow1_Restaurant_Menu.postman_collection.json)** - Postman Collection
 - **[CUSTOMER_AUTH_TESTING.md](CUSTOMER_AUTH_TESTING.md)** - Test authentication
 - **[test-product-service.ps1](test-product-service.ps1)** - Test Product Service
 - **[POSTMAN_TESTING_GUIDE.md](POSTMAN_TESTING_GUIDE.md)** - Postman collection
@@ -420,6 +427,8 @@ Frontend (http://localhost:5173)
 ### Architecture & Design
 - **[PRD_VS_SCHEMA_COMPARISON.md](PRD_VS_SCHEMA_COMPARISON.md)** - PRD vs Implementation
 - **[AUTH_CHANGES_SUMMARY.md](AUTH_CHANGES_SUMMARY.md)** - Authentication improvements
+- **[DATABASE_ISOLATION_ANALYSIS.md](DATABASE_ISOLATION_ANALYSIS.md)** 🔒 - Phân tích Database Isolation
+- **[DATABASE_ISOLATION_VISUAL.md](DATABASE_ISOLATION_VISUAL.md)** 🎨 - Hướng dẫn Database Isolation (Visual)
 
 ---
 

@@ -4,6 +4,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const connectDB = require('./config/database');
 const productRoutes = require('./routes/productRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
+const dishRoutes = require('./routes/dishRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 // Load environment variables
@@ -27,6 +29,10 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/api/products', productRoutes);
+
+// Luồng 1: Category & Dish Management
+app.use('/api/categories', categoryRoutes);
+app.use('/api/dishes', dishRoutes);
 
 // Error handling
 app.use(errorHandler);

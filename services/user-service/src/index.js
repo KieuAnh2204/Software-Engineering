@@ -5,6 +5,8 @@ import connectDB from './config/database.js';
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import restaurantRoutes from './routes/restaurantRoutes.js';
+import brandRoutes from './routes/brandRoutes.js';
+import restaurantBranchRoutes from './routes/restaurantBranchRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 dotenv.config();
@@ -36,6 +38,10 @@ app.get('/health', (req, res) => {
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/restaurant', restaurantRoutes);
+
+// Luồng 1: Brand & Restaurant Management
+app.use('/api/brands', brandRoutes);
+app.use('/api/restaurants', restaurantBranchRoutes);
 
 // Error handling
 app.use(errorHandler);

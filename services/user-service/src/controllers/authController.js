@@ -34,7 +34,7 @@ export const register = async (req, res, next) => {
       username,
       email,
       password,
-      role: role || 'user',
+      role: role || 'customer',
       fullName,
       phone
     });

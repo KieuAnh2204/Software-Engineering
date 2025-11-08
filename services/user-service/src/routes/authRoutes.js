@@ -22,7 +22,7 @@ const registerValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Invalid email'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('phone').notEmpty().withMessage('Phone number is required'),
-  body('role').optional().isIn(['customer', 'restaurant', 'admin']).withMessage('Invalid role')
+  body('role').optional().isIn(['customer', 'restaurant', 'admin', 'BRAND_MANAGER']).withMessage('Invalid role')
 ];
 
 const customerRegisterValidation = [
