@@ -1,26 +1,38 @@
 const express = require('express');
-const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const {
-  getAllOrders,
-  getOrder,
   createOrder,
-  updateOrderStatus,
-  cancelOrder,
-  getUserOrders,
-  getRestaurantOrders
+  getOrders,
+  getOrderById,
+  updateOrderStatus
 } = require('../controllers/orderController');
+const { authenticate, authorize } = require('../middleware/auth');
 
-router.route('/')
-  .get(getAllOrders)
-  .post(createOrder);
+const router = express.Router();
 
-router.route('/:id')
-  .get(getOrder);
+const orderCreationLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many order attempts, please try again shortly'
+});
 
-router.put('/:id/status', updateOrderStatus);
-router.put('/:id/cancel', cancelOrder);
+router.use(authenticate);
 
-router.get('/user/:userId', getUserOrders);
-router.get('/restaurant/:restaurantId', getRestaurantOrders);
+router
+  .route('/')
+  .post(orderCreationLimiter, createOrder)
+  .get(getOrders);
+
+router
+  .route('/:id')
+  .get(getOrderById);
+
+router.put(
+  '/:id/status',
+  authorize('restaurant', 'BRAND_MANAGER', 'admin'),
+  updateOrderStatus
+);
 
 module.exports = router;
