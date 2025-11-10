@@ -43,7 +43,6 @@ const productSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for faster queries
 productSchema.index({ restaurantId: 1, category: 1 });
 productSchema.index({ name: 'text', description: 'text' });
 

@@ -1,58 +1,35 @@
-import mongoose from 'mongoose';
+﻿import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
-/**
- * RestaurantBrand Model - Đại diện cho thương hiệu nhà hàng
- * Ví dụ: "Phở A", "Highland Coffee", "KFC Vietnam"
- */
 const restaurantBrandSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, 'Brand name is required'],
-    trim: true,
-    maxlength: [100, 'Brand name cannot exceed 100 characters']
-  },
-  description: {
-    type: String,
-    trim: true,
-    maxlength: [500, 'Description cannot exceed 500 characters']
-  },
-  logo: {
-    type: String,
-    default: null
-  },
-  ownerId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: [true, 'Owner ID is required']
-  },
-  ownerEmail: {
-    type: String,
-    required: true
-  },
-  ownerName: {
-    type: String,
-    required: true
-  },
-  status: {
-    type: String,
-    enum: ['active', 'inactive', 'suspended'],
-    default: 'active'
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
+  email: { type: String, required: true, unique: true, trim: true, lowercase: true },
+  password: { type: String, required: true, minlength: 6 },
+  username: { type: String, required: true, unique: true, trim: true },
+  name: { type: String, required: true },
+  logo_url: { type: String },
+  brand_id: { type: String, unique: true, sparse: true },
+  status: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], default: 'PENDING' }
 }, {
   timestamps: true,
-  collection: 'restaurant_brands'
+  strict: 'throw'
 });
 
-// Index để tìm kiếm nhanh
-restaurantBrandSchema.index({ ownerId: 1 });
-restaurantBrandSchema.index({ name: 'text', description: 'text' });
+// Indexes are inferred from unique fields; avoid duplicate explicit indexes
+
+restaurantBrandSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
+
+restaurantBrandSchema.methods.comparePassword = async function(candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
+};
+
+restaurantBrandSchema.methods.toJSON = function() {
+  const obj = this.toObject();
+  delete obj.password;
+  return obj;
+};
 
 export default mongoose.model('RestaurantBrand', restaurantBrandSchema);

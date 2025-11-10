@@ -2,11 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './config/database.js';
-import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
-import restaurantRoutes from './routes/restaurantRoutes.js';
 import brandRoutes from './routes/brandRoutes.js';
-import restaurantBranchRoutes from './routes/restaurantBranchRoutes.js';
+import restaurantRoutes from './routes/restaurantRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 dotenv.config();
@@ -35,13 +33,10 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/restaurant', restaurantRoutes);
-
-// Luồng 1: Brand & Restaurant Management
+// Brand & Restaurant Management (restaurant endpoints now live under /api/auth)
 app.use('/api/brands', brandRoutes);
-app.use('/api/restaurants', restaurantBranchRoutes);
+app.use('/api/restaurants', restaurantRoutes);
 
 // Error handling
 app.use(errorHandler);

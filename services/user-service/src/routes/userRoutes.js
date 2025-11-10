@@ -1,35 +1,19 @@
 import express from 'express';
 import { 
-  getAllUsers, 
-  getUserById, 
-  updateUser, 
-  deleteUser,
-  getAllRestaurants,
-  getRestaurantById,
-  searchRestaurants,
-  updateRestaurantStatus
+  getAllCustomers,
+  getAllRestaurantBrands
 } from '../controllers/userController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Public routes - không cần authentication
-router.get('/restaurants', getAllRestaurants);
-router.get('/restaurants/search', searchRestaurants);
-router.get('/restaurants/:id', getRestaurantById);
+// Protected routes - Admin only
+router.use(authenticate, authorize('ADMIN'));
 
-// Protected restaurant routes
-router.put('/restaurants/:id/status', authenticate, updateRestaurantStatus);
+// GET /api/users/customers - Lấy tất cả customers (pagination)
+router.get('/customers', getAllCustomers);
 
-// All other routes require authentication
-router.use(authenticate);
-
-// Admin only routes
-router.get('/', authorize('admin'), getAllUsers);
-router.delete('/:id', authorize('admin'), deleteUser);
-
-// User routes
-router.get('/:id', getUserById);
-router.put('/:id', updateUser);
+// GET /api/users/brands - Lấy tất cả restaurant brands (pagination + status filter)
+router.get('/brands', getAllRestaurantBrands);
 
 export default router;

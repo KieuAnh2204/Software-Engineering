@@ -1,0 +1,315 @@
+{
+  "info": {
+	"_postman_id": "user-service-api-collection",
+	"name": "User Service API",
+	"description": "Complete API endpoints for User Service with separate customer/restaurant flows and admin status management.",
+	"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+	"type": "bearer",
+	"bearer": [
+	  { "key": "token", "value": "{{authToken}}", "type": "string" }
+	]
+  },
+  "variable": [
+	{ "key": "baseUrl", "value": "http://localhost:3001", "type": "string" },
+	{ "key": "authToken", "value": "", "type": "string" },
+	{ "key": "customerToken", "value": "", "type": "string" },
+	{ "key": "ownerToken", "value": "", "type": "string" },
+	{ "key": "ADMIN_SECRET", "value": "", "type": "string" },
+	{ "key": "brandId", "value": "", "type": "string" },
+	{ "key": "restaurantId", "value": "", "type": "string" }
+  ],
+  "item": [
+	{
+	  "name": "1. Authentication",
+	  "item": [
+		{
+		  "name": "Register Customer",
+		  "event": [
+			{
+			  "listen": "test",
+			  "script": {
+				"exec": [
+				  "if (pm.response.code === 201) {",
+				  "  const res = pm.response.json();",
+				  "  const token = res.data && res.data.token ? res.data.token : res.token;",
+				  "  if (token) {",
+				  "    pm.collectionVariables.set('customerToken', token);",
+				  "    pm.collectionVariables.set('authToken', token);",
+				  "  }",
+				  "}"
+				],
+				"type": "text/javascript"
+			  }
+			}
+		  ],
+		  "request": {
+			"method": "POST",
+			"header": [ { "key": "Content-Type", "value": "application/json" } ],
+			"body": {
+			  "mode": "raw",
+			  "raw": "{\n  \"email\": \"customer.new@example.com\",\n  \"password\": \"password123\",\n  \"username\": \"customernew\",\n  \"full_name\": \"New Customer\",\n  \"phone\": \"0900000999\",\n  \"address\": \"HCM District 5\"\n}"
+			},
+			"url": { "raw": "{{baseUrl}}/api/auth/register/customer", "host": ["{{baseUrl}}"], "path": ["api","auth","register","customer"] }
+		  },
+		  "response": []
+		},
+		{
+		  "name": "Register Restaurant Brand",
+		  "event": [
+			{
+			  "listen": "test",
+			  "script": {
+				"exec": [
+				  "if (pm.response.code === 201) {",
+				  "  const res = pm.response.json();",
+				  "  const token = res.data && res.data.token ? res.data.token : res.token;",
+				  "  if (token) {",
+				  "    pm.collectionVariables.set('ownerToken', token);",
+				  "    pm.collectionVariables.set('authToken', token);",
+				  "  }",
+				  "}"
+				],
+				"type": "text/javascript"
+			  }
+			}
+		  ],
+		  "request": {
+			"method": "POST",
+			"header": [ { "key": "Content-Type", "value": "application/json" } ],
+			"body": {
+			  "mode": "raw",
+			  "raw": "{\n  \"email\": \"owner.new@example.com\",\n  \"password\": \"owner123\",\n  \"username\": \"ownernew\",\n  \"name\": \"Pizza Paradise\",\n  \"logo_url\": \"https://example.com/logo.png\"\n}"
+			},
+			"url": { "raw": "{{baseUrl}}/api/auth/register/restaurant", "host": ["{{baseUrl}}"], "path": ["api","auth","register","restaurant"] }
+		  },
+		  "response": []
+		},
+		{
+		  "name": "Login Customer",
+		  "event": [
+			{
+			  "listen": "test",
+			  "script": {
+				"exec": [
+				  "if (pm.response.code === 200) {",
+				  "  const res = pm.response.json();",
+				  "  const token = res.data && res.data.token ? res.data.token : res.token;",
+				  "  if (token) {",
+				  "    pm.collectionVariables.set('customerToken', token);",
+				  "    pm.collectionVariables.set('authToken', token);",
+				  "  }",
+				  "}"
+				],
+				"type": "text/javascript"
+			  }
+			}
+		  ],
+		  "request": {
+			"method": "POST",
+			"header": [ { "key": "Content-Type", "value": "application/json" } ],
+			"body": { "mode": "raw", "raw": "{\n  \"email\": \"alice@example.com\",\n  \"password\": \"password123\"\n}" },
+			"url": { "raw": "{{baseUrl}}/api/auth/login/customer", "host": ["{{baseUrl}}"], "path": ["api","auth","login","customer"] }
+		  },
+		  "response": []
+		},
+		{
+		  "name": "Login Restaurant Brand",
+		  "event": [
+			{
+			  "listen": "test",
+			  "script": {
+				"exec": [
+				  "if (pm.response.code === 200) {",
+				  "  const res = pm.response.json();",
+				  "  const token = res.data && res.data.token ? res.data.token : res.token;",
+				  "  if (token) {",
+				  "    pm.collectionVariables.set('ownerToken', token);",
+				  "    pm.collectionVariables.set('authToken', token);",
+				  "  }",
+				  "}"
+				],
+				"type": "text/javascript"
+			  }
+			}
+		  ],
+		  "request": {
+			"method": "POST",
+			"header": [ { "key": "Content-Type", "value": "application/json" } ],
+			"body": { "mode": "raw", "raw": "{\n  \"email\": \"brand1@example.com\",\n  \"password\": \"owner123\"\n}" },
+			"url": { "raw": "{{baseUrl}}/api/auth/login/restaurant", "host": ["{{baseUrl}}"], "path": ["api","auth","login","restaurant"] }
+		  },
+		  "response": []
+		},
+		{
+		  "name": "Get Customer Me",
+		  "request": {
+			"auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{customerToken}}", "type": "string" } ] },
+			"method": "GET",
+			"header": [],
+			"url": { "raw": "{{baseUrl}}/api/auth/customers/me", "host": ["{{baseUrl}}"], "path": ["api","auth","customers","me"] }
+		  },
+		  "response": []
+		},
+		{
+		  "name": "Get Brand Me",
+		  "event": [
+			{
+			  "listen": "test",
+			  "script": {
+				"exec": [
+				  "if (pm.response.code === 200) {",
+				  "  const res = pm.response.json();",
+				  "  if (res.data && res.data._id) { pm.collectionVariables.set('brandId', res.data._id); }",
+				  "}"
+				],
+				"type": "text/javascript"
+			  }
+			}
+		  ],
+		  "request": {
+			"auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{ownerToken}}", "type": "string" } ] },
+			"method": "GET",
+			"header": [],
+			"url": { "raw": "{{baseUrl}}/api/auth/brands/me", "host": ["{{baseUrl}}"], "path": ["api","auth","brands","me"] }
+		  },
+		  "response": []
+		},
+		{
+		  "name": "Get My Restaurants (Owner)",
+		  "event": [
+			{
+			  "listen": "test",
+			  "script": {
+				"exec": [
+				  "if (pm.response.code === 200) {",
+				  "  const res = pm.response.json();",
+				  "  if (res.data && res.data.restaurants && res.data.restaurants.length > 0) {",
+				  "    pm.collectionVariables.set('restaurantId', res.data.restaurants[0]._id);",
+				  "  }",
+				  "}"
+				],
+				"type": "text/javascript"
+			  }
+			}
+		  ],
+		  "request": {
+			"auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{ownerToken}}", "type": "string" } ] },
+			"method": "GET",
+			"header": [],
+			"url": { "raw": "{{baseUrl}}/api/auth/restaurants/my", "host": ["{{baseUrl}}"], "path": ["api","auth","restaurants","my"] }
+		  },
+		  "response": []
+		}
+	  ]
+	},
+	{
+	  "name": "2. Brand Management (Owner)",
+	  "item": [
+		{
+		  "name": "Create Restaurant (Under My Brand)",
+		  "event": [
+			{
+			  "listen": "test",
+			  "script": {
+				"exec": [
+				  "if (pm.response.code === 201) {",
+				  "  const res = pm.response.json();",
+				  "  if (res.data && res.data.restaurant) { pm.collectionVariables.set('restaurantId', res.data.restaurant._id); }",
+				  "}"
+				],
+				"type": "text/javascript"
+			  }
+			}
+		  ],
+		  "request": {
+			"auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{ownerToken}}", "type": "string" } ] },
+			"method": "POST",
+			"header": [ { "key": "Content-Type", "value": "application/json" } ],
+			"body": { "mode": "raw", "raw": "{\n  \"name\": \"Pho Express - District 7\",\n  \"address\": \"789 Nguyen Thi Thap, D7, HCM\",\n  \"phone\": \"0909009007\",\n  \"restaurant_id\": \"REST-PHO-D7\"\n}" },
+			"url": { "raw": "{{baseUrl}}/api/brands/{{brandId}}/restaurants", "host": ["{{baseUrl}}"], "path": ["api","brands","{{brandId}}","restaurants"] }
+		  },
+		  "response": []
+		}
+	  ]
+	},
+	{
+	  "name": "3. Admin - Restaurant Status",
+	  "item": [
+		{
+		  "name": "Approve Restaurant",
+		  "request": {
+			"method": "PATCH",
+			"header": [
+			  { "key": "Content-Type", "value": "application/json" },
+			  { "key": "x-admin-secret", "value": "{{ADMIN_SECRET}}", "type": "text" }
+			],
+			"body": { "mode": "raw", "raw": "{\n  \"status\": \"APPROVED\"\n}" },
+			"url": { "raw": "{{baseUrl}}/api/restaurants/{{restaurantId}}/status", "host": ["{{baseUrl}}"], "path": ["api","restaurants","{{restaurantId}}","status"] }
+		  },
+		  "response": []
+		},
+		{
+		  "name": "Reject Restaurant",
+		  "request": {
+			"method": "PATCH",
+			"header": [
+			  { "key": "Content-Type", "value": "application/json" },
+			  { "key": "x-admin-secret", "value": "{{ADMIN_SECRET}}", "type": "text" }
+			],
+			"body": { "mode": "raw", "raw": "{\n  \"status\": \"REJECTED\"\n}" },
+			"url": { "raw": "{{baseUrl}}/api/restaurants/{{restaurantId}}/status", "host": ["{{baseUrl}}"], "path": ["api","restaurants","{{restaurantId}}","status"] }
+		  },
+		  "response": []
+		},
+		{
+		  "name": "Close Restaurant",
+		  "request": {
+			"method": "PATCH",
+			"header": [
+			  { "key": "Content-Type", "value": "application/json" },
+			  { "key": "x-admin-secret", "value": "{{ADMIN_SECRET}}", "type": "text" }
+			],
+			"body": { "mode": "raw", "raw": "{\n  \"status\": \"CLOSED\"\n}" },
+			"url": { "raw": "{{baseUrl}}/api/restaurants/{{restaurantId}}/status", "host": ["{{baseUrl}}"], "path": ["api","restaurants","{{restaurantId}}","status"] }
+		  },
+		  "response": []
+		}
+	  ]
+	},
+	{
+	  "name": "4. Public Brands",
+	  "item": [
+		{
+		  "name": "Get All Brands",
+		  "request": {
+			"method": "GET",
+			"header": [],
+			"url": {
+			  "raw": "{{baseUrl}}/api/brands?page=1&limit=10",
+			  "host": ["{{baseUrl}}"],
+			  "path": ["api","brands"],
+			  "query": [ { "key": "page", "value": "1" }, { "key": "limit", "value": "10" } ]
+			}
+		  },
+		  "response": []
+		},
+		{
+		  "name": "Get Brand By ID",
+		  "request": {
+			"method": "GET",
+			"header": [],
+			"url": { "raw": "{{baseUrl}}/api/brands/{{brandId}}", "host": ["{{baseUrl}}"], "path": ["api","brands","{{brandId}}"] }
+		  },
+		  "response": []
+		}
+	  ]
+	},
+	{
+	  "name": "Health Check",
+	  "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] } },
+	  "response": []
+	}
+  ]
+}

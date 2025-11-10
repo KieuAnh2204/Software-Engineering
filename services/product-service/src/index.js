@@ -3,10 +3,16 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
 const connectDB = require('./config/database');
+// Reverting back to legacy product routes; removing Category & Dish domain
 const productRoutes = require('./routes/productRoutes');
-const categoryRoutes = require('./routes/categoryRoutes');
-const dishRoutes = require('./routes/dishRoutes');
+// Category & Dish domain disabled
+// const categoryRoutes = require('./routes/categoryRoutes');
+// const dishRoutes = require('./routes/dishRoutes');
 const errorHandler = require('./middleware/errorHandler');
+
+// For debugging why process exits early, log basic startup info
+console.log(`[Startup] cwd = ${process.cwd()}`);
+console.log(`[Startup] NODE_ENV = ${process.env.NODE_ENV}`);
 
 // Load environment variables
 dotenv.config();
@@ -30,17 +36,23 @@ app.get('/health', (req, res) => {
 // Routes
 app.use('/api/products', productRoutes);
 
-// Luồng 1: Category & Dish Management
-app.use('/api/categories', categoryRoutes);
-app.use('/api/dishes', dishRoutes);
+// Category & Dish routes removed
 
 // Error handling
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3003;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Product Service running on port ${PORT}`);
+});
+
+// Handle unhandled rejections & exceptions to avoid silent exits
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Rejection:', err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
 });
 
 module.exports = app;

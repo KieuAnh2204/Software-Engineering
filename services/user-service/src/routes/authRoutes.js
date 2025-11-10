@@ -1,65 +1,71 @@
 import express from 'express';
 import { body } from 'express-validator';
 import { 
-  register, 
-  login, 
-  getProfile,
   registerCustomer,
-  getCustomerProfile,
-  updateCustomerProfile,
   registerRestaurant,
+  loginCustomer,
   loginRestaurant,
-  getRestaurantProfile,
-  updateRestaurantProfile
+  getCustomerMe,
+  getBrandMe,
+  getMyRestaurants,
 } from '../controllers/authController.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Validation rules
-const registerValidation = [
-  body('username').trim().isLength({ min: 3, max: 30 }).withMessage('Username must be 3-30 characters'),
-  body('email').isEmail().normalizeEmail().withMessage('Invalid email'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  body('phone').notEmpty().withMessage('Phone number is required'),
-  body('role').optional().isIn(['customer', 'restaurant', 'admin', 'BRAND_MANAGER']).withMessage('Invalid role')
-];
+// ==================== VALIDATION RULES ====================
 
+// Validation cho đăng ký Customer
 const customerRegisterValidation = [
-  body('username').trim().isLength({ min: 3, max: 30 }).withMessage('Username must be 3-30 characters'),
   body('email').isEmail().normalizeEmail().withMessage('Invalid email'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  body('fullName').notEmpty().withMessage('Full name is required'),
+  body('username').isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
+  body('full_name').notEmpty().withMessage('Full name is required'),
   body('phone').notEmpty().withMessage('Phone number is required'),
-  body('address').optional()
+  body('address').notEmpty().withMessage('Address is required')
 ];
 
-const restaurantRegisterValidation = [
-  body('username').trim().isLength({ min: 3, max: 30 }).withMessage('Username must be 3-30 characters'),
+// Validation cho đăng ký Restaurant Owner (Brand Manager)
+const restaurantOwnerRegisterValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Invalid email'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  body('fullName').notEmpty().withMessage('Full name is required'),
-  body('phone').notEmpty().withMessage('Phone number is required'),
-  body('restaurantName').notEmpty().withMessage('Restaurant name is required'),
-  body('address').notEmpty().withMessage('Address is required'),
-  body('description').optional(),
-  body('cuisine').optional().isArray().withMessage('Cuisine must be an array')
+  body('username').isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
+  body('name').notEmpty().withMessage('Brand name is required'),
+  body('logo_url').optional().isURL().withMessage('Logo URL must be valid')
 ];
 
+// Validation cho login
 const loginValidation = [
-  body('username').optional().trim().isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
-  body('email').optional().isEmail().normalizeEmail().withMessage('Invalid email'),
+  body('email').isEmail().normalizeEmail().withMessage('Invalid email'),
   body('password').notEmpty().withMessage('Password is required')
 ];
 
-// ==================== GENERAL AUTH ROUTES ====================
-router.post('/register', registerValidation, register);
-router.post('/login', loginValidation, login);
-router.get('/profile', authenticate, getProfile);
+// Validation cho tạo Restaurant
+const createRestaurantValidation = [
+  body('name').notEmpty().withMessage('Restaurant name is required'),
+  body('address').notEmpty().withMessage('Address is required'),
+  body('phone').notEmpty().withMessage('Phone number is required')
+];
 
-// ==================== CUSTOMER ROUTES ====================
+// ==================== ROUTES ====================
+
+// Đăng ký Customer
 router.post('/register/customer', customerRegisterValidation, registerCustomer);
-router.get('/customer/me', authenticate, getCustomerProfile);
-router.patch('/customer/me', authenticate, updateCustomerProfile);
+
+// Đăng ký Restaurant Brand (Brand Manager)
+router.post('/register/restaurant', restaurantOwnerRegisterValidation, registerRestaurant);
+
+// Login tách biệt
+router.post('/login/customer', loginValidation, loginCustomer);
+router.post('/login/restaurant', loginValidation, loginRestaurant);
+
+// Profile endpoints
+router.get('/customers/me', authenticate, getCustomerMe);
+router.get('/brands/me', authenticate, getBrandMe);
+
+// Restaurant management (RESTAURANT_OWNER only)
+router.get('/restaurants/my', authenticate, getMyRestaurants);
+
+// Admin route moved to restaurantsRoutes
 
 export default router;
