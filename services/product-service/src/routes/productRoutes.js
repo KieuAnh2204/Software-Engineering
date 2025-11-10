@@ -1,23 +1,21 @@
 const express = require('express');
-const router = express.Router();
 const {
-  getAllProducts,
-  getProduct,
   createProduct,
+  getProducts,
+  getProductById,
   updateProduct,
-  deleteProduct,
-  getProductsByRestaurant
+  deleteProduct
 } = require('../controllers/productController');
 
-router.route('/')
-  .get(getAllProducts)
-  .post(createProduct);
+const router = express.Router();
 
-router.route('/:id')
-  .get(getProduct)
-  .put(updateProduct)
-  .delete(deleteProduct);
+// Public list & detail
+router.get('/', getProducts);
+router.get('/:id', getProductById);
 
-router.get('/restaurant/:restaurantId', getProductsByRestaurant);
+// Simplified: no auth middleware (can be added later)
+router.post('/', createProduct);
+router.put('/:id', updateProduct);
+router.delete('/:id', deleteProduct);
 
 module.exports = router;

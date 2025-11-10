@@ -1,491 +1,149 @@
-import { validationResult } from 'express-validator';
-import User from '../models/User.js';
+﻿import { validationResult } from 'express-validator';
+import Customer from '../models/Customer.js';
+import RestaurantBrand from '../models/RestaurantBrand.js';
+import Restaurant from '../models/Restaurant.js';
 import jwt from 'jsonwebtoken';
 
-// Generate JWT token
-const generateToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE || '7d'
-  });
-};
+const generateToken = (userId) => jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE || '7d' });
 
-// @desc    Register new user
-// @route   POST /api/auth/register
-// @access  Public
-export const register = async (req, res, next) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { username, email, password, role, fullName, phone } = req.body;
-
-    // Check if user exists
-    const userExists = await User.findOne({ $or: [{ email }, { username }] });
-    if (userExists) {
-      return res.status(400).json({ 
-        message: 'User already exists with this email or username' 
-      });
-    }
-
-    // Create user
-    const user = await User.create({
-      username,
-      email,
-      password,
-      role: role || 'customer',
-      fullName,
-      phone
-    });
-
-    const token = generateToken(user._id);
-
-    res.status(201).json({
-      success: true,
-      data: {
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-          fullName: user.fullName
-        },
-        token
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
-export const login = async (req, res, next) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { email, username, password } = req.body;
-
-    // Find user by email or username
-    const query = email ? { email } : { username };
-    const user = await User.findOne(query).select('+password');
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    // Check if user is active
-    if (!user.isActive) {
-      return res.status(401).json({ message: 'Account is deactivated' });
-    }
-
-    // Check password
-    const isPasswordMatch = await user.comparePassword(password);
-    if (!isPasswordMatch) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    const token = generateToken(user._id);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-          fullName: user.fullName
-        },
-        token
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Get user profile
-// @route   GET /api/auth/profile
-// @access  Private
-export const getProfile = async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user.id);
-    
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: user
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// ==================== CUSTOMER ENDPOINTS ====================
-
-// @desc    Register new customer
-// @route   POST /api/auth/register/customer
-// @access  Public
+// Register Customer
 export const registerCustomer = async (req, res, next) => {
   try {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { username, email, password, fullName, phone, address } = req.body;
+    const { email, password, username, full_name, phone, address } = req.body;
 
-    // Check if user exists
-    const userExists = await User.findOne({ $or: [{ email }, { username }] });
-    if (userExists) {
-      return res.status(400).json({ 
-        message: 'User already exists with this email or username' 
-      });
-    }
+    if (await Customer.findOne({ email })) return res.status(400).json({ success: false, message: 'Email already exists' });
+    if (await Customer.findOne({ username })) return res.status(400).json({ success: false, message: 'Username already exists' });
 
-    // Create customer with role automatically set to 'customer'
-    const user = await User.create({
-      username,
-      email,
-      password,
-      role: 'customer',
-      fullName,
-      phone,
-      customerProfile: {
-        address: address || '',
-        phoneNumber: phone
-      }
-    });
+  const customer = await Customer.create({ email, password, username, full_name, phone, address: address || '' });
+  const token = generateToken(customer._id);
 
-    const token = generateToken(user._id);
-
-    res.status(201).json({
-      success: true,
-      message: 'Customer registered successfully',
-      data: {
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-          fullName: user.fullName,
-          phone: user.phone
-        },
-        token
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
+    res.status(201).json({ success: true, message: 'Customer registered successfully', data: { customer: customer.toJSON(), token } });
+  } catch (error) { next(error); }
 };
 
-// @desc    Get customer profile
-// @route   GET /api/auth/customer/me
-// @access  Private (Customer only)
-export const getCustomerProfile = async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user.id);
-    
-    if (!user) {
-      return res.status(404).json({ message: 'Customer not found' });
-    }
-
-    if (user.role !== 'customer') {
-      return res.status(403).json({ message: 'Access denied. Customer only.' });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        fullName: user.fullName,
-        phone: user.phone,
-        role: user.role,
-        customerProfile: user.customerProfile,
-        createdAt: user.createdAt
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Update customer profile
-// @route   PATCH /api/auth/customer/me
-// @access  Private (Customer only)
-export const updateCustomerProfile = async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user.id);
-    
-    if (!user) {
-      return res.status(404).json({ message: 'Customer not found' });
-    }
-
-    if (user.role !== 'customer') {
-      return res.status(403).json({ message: 'Access denied. Customer only.' });
-    }
-
-    const { fullName, phone, address } = req.body;
-
-    // Update fields
-    if (fullName) user.fullName = fullName;
-    if (phone) user.phone = phone;
-    if (address) {
-      user.customerProfile = user.customerProfile || {};
-      user.customerProfile.address = address;
-    }
-
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Customer profile updated successfully',
-      data: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        fullName: user.fullName,
-        phone: user.phone,
-        customerProfile: user.customerProfile
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// ==================== RESTAURANT ENDPOINTS ====================
-
-// @desc    Register new restaurant
-// @route   POST /api/restaurant/register
-// @access  Public
+// Register Restaurant Brand (owner account)
 export const registerRestaurant = async (req, res, next) => {
   try {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { 
-      username, 
-      email, 
-      password, 
-      fullName, 
-      phone,
-      restaurantName,
-      address,
-      description,
-      cuisine
-    } = req.body;
+    const { email, password, username, name, logo_url } = req.body;
+    if (await RestaurantBrand.findOne({ email })) return res.status(400).json({ success: false, message: 'Email already exists' });
+    if (await RestaurantBrand.findOne({ username })) return res.status(400).json({ success: false, message: 'Username already exists' });
 
-    // Check if user exists
-    const userExists = await User.findOne({ $or: [{ email }, { username }] });
-    if (userExists) {
-      return res.status(400).json({ 
-        message: 'User already exists with this email or username' 
-      });
-    }
+  const brand = await RestaurantBrand.create({ email, password, username, name, logo_url: logo_url || null, status: 'PENDING' });
+  const token = generateToken(brand._id);
 
-    // Create restaurant user with role automatically set to 'restaurant'
-    const user = await User.create({
-      username,
-      email,
-      password,
-      role: 'restaurant',
-      fullName,
-      phone,
-      restaurantProfile: {
-        restaurantName: restaurantName || fullName,
-        address: address || '',
-        phoneNumber: phone,
-        description: description || '',
-        cuisine: cuisine || [],
-        isVerified: false
-      }
-    });
-
-    const token = generateToken(user._id);
-
-    res.status(201).json({
-      success: true,
-      message: 'Restaurant registered successfully. Waiting for admin verification.',
-      data: {
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-          fullName: user.fullName,
-          phone: user.phone,
-          restaurantProfile: user.restaurantProfile
-        },
-        token
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
+    res.status(201).json({ success: true, message: 'Restaurant owner registered successfully', data: { restaurantBrand: brand.toJSON(), token } });
+  } catch (error) { next(error); }
 };
 
-// @desc    Restaurant login
-// @route   POST /api/restaurant/login
-// @access  Public
+// Login Customer only
+export const loginCustomer = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    const { email, password } = req.body;
+
+  const user = await Customer.findOne({ email }).select('+password');
+  const userType = 'customer';
+  if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+
+    const match = await user.comparePassword(password);
+    if (!match) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+
+  const token = generateToken(user._id);
+    const baseUser = user.toJSON();
+    res.status(200).json({ success: true, message: 'Login successful', data: { user: { ...baseUser, userType }, token } });
+  } catch (error) { next(error); }
+};
+
+// Login Restaurant Brand only
 export const loginRestaurant = async (req, res, next) => {
   try {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    const { email, password } = req.body;
 
-    const { email, username, password } = req.body;
+    const user = await RestaurantBrand.findOne({ email }).select('+password');
+    const userType = 'restaurantBrand';
+    if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
-    // Find user by email or username
-    const query = email ? { email } : { username };
-    const user = await User.findOne(query).select('+password');
-    
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    // Check if user is restaurant
-    if (user.role !== 'restaurant') {
-      return res.status(403).json({ message: 'Access denied. Restaurant only.' });
-    }
-
-    // Check if user is active
-    if (!user.isActive) {
-      return res.status(401).json({ message: 'Account is deactivated' });
-    }
-
-    // Check password
-    const isPasswordMatch = await user.comparePassword(password);
-    if (!isPasswordMatch) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
+    const match = await user.comparePassword(password);
+    if (!match) return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
     const token = generateToken(user._id);
-
-    res.status(200).json({
-      success: true,
-      message: 'Restaurant logged in successfully',
-      data: {
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-          fullName: user.fullName,
-          restaurantProfile: user.restaurantProfile
-        },
-        token
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
+    const baseUser = user.toJSON();
+    res.status(200).json({ success: true, message: 'Login successful', data: { user: { ...baseUser, userType }, token } });
+  } catch (error) { next(error); }
 };
 
-// @desc    Get restaurant profile
-// @route   GET /api/restaurant/profile
-// @access  Private (Restaurant only)
-export const getRestaurantProfile = async (req, res, next) => {
+// Get profile endpoints
+export const getCustomerMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id);
-    
-    if (!user) {
-      return res.status(404).json({ message: 'Restaurant not found' });
-    }
-
-    if (user.role !== 'restaurant') {
-      return res.status(403).json({ message: 'Access denied. Restaurant only.' });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        fullName: user.fullName,
-        phone: user.phone,
-        role: user.role,
-        restaurantProfile: user.restaurantProfile,
-        createdAt: user.createdAt
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
+    if (req.user.type !== 'customer') return res.status(403).json({ success: false, message: 'Access denied' });
+    const user = await Customer.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    res.status(200).json({ success: true, data: user });
+  } catch (error) { next(error); }
 };
 
-// @desc    Update restaurant profile
-// @route   PUT /api/restaurant/update
-// @access  Private (Restaurant only)
-export const updateRestaurantProfile = async (req, res, next) => {
+export const getBrandMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id);
-    
-    if (!user) {
-      return res.status(404).json({ message: 'Restaurant not found' });
-    }
+    if (req.user.type !== 'restaurantBrand') return res.status(403).json({ success: false, message: 'Access denied' });
+    const brand = await RestaurantBrand.findById(req.user.id);
+    if (!brand) return res.status(404).json({ success: false, message: 'User not found' });
+    const restaurants = await Restaurant.find({ brand_id: req.user.id });
+    const user = { ...brand.toJSON(), restaurants };
+    res.status(200).json({ success: true, data: user });
+  } catch (error) { next(error); }
+};
 
-    if (user.role !== 'restaurant') {
-      return res.status(403).json({ message: 'Access denied. Restaurant only.' });
-    }
+// Brand submits a restaurant under its brand id
+export const createRestaurantUnderBrand = async (req, res, next) => {
+  try {
+    if (req.user.type !== 'restaurantBrand') return res.status(403).json({ success: false, message: 'Only restaurant owners can create restaurants' });
+    const { brandId } = req.params;
+    if (req.user.id !== brandId) return res.status(403).json({ success: false, message: 'Cannot create restaurant for another brand' });
+    const brand = await RestaurantBrand.findById(brandId);
+    if (!brand) return res.status(404).json({ success: false, message: 'Restaurant brand not found' });
 
-    const { 
-      fullName, 
-      phone, 
-      restaurantName, 
-      address, 
-      description, 
-      cuisine,
-      openingHours,
-      businessLicense
-    } = req.body;
+    const { name, address, phone, restaurant_id } = req.body;
+    const restaurant = await Restaurant.create({ name, address, phone, restaurant_id, brand_id: brandId, status: 'PENDING' });
+    res.status(201).json({ success: true, message: 'Restaurant created successfully', data: { restaurant } });
+  } catch (error) { next(error); }
+};
 
-    // Update basic fields
-    if (fullName) user.fullName = fullName;
-    if (phone) user.phone = phone;
-
-    // Update restaurant profile
-    if (!user.restaurantProfile) {
-      user.restaurantProfile = {};
-    }
-
-    if (restaurantName) user.restaurantProfile.restaurantName = restaurantName;
-    if (address) user.restaurantProfile.address = address;
-    if (phone) user.restaurantProfile.phoneNumber = phone;
-    if (description) user.restaurantProfile.description = description;
-    if (cuisine) user.restaurantProfile.cuisine = cuisine;
-    if (openingHours) user.restaurantProfile.openingHours = openingHours;
-    if (businessLicense) user.restaurantProfile.businessLicense = businessLicense;
-
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Restaurant profile updated successfully',
-      data: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        fullName: user.fullName,
-        phone: user.phone,
-        restaurantProfile: user.restaurantProfile
-      }
-    });
+// Get restaurants owned by the brand owner
+export const getMyRestaurants = async (req, res, next) => {
+  try {
+    if (req.user.type !== 'restaurantBrand') return res.status(403).json({ success: false, message: 'Access denied' });
+    const restaurants = await Restaurant.find({ brand_id: req.user.id });
+    res.status(200).json({ success: true, data: { count: restaurants.length, restaurants } });
   } catch (error) {
     next(error);
   }
 };
+
+// Admin: update restaurant status (exported for restaurantRoutes)
+export const updateRestaurantStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const allowed = ['APPROVED', 'REJECTED', 'CLOSED'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ success: false, message: `Invalid status. Allowed: ${allowed.join(', ')}` });
+    }
+    const restaurant = await Restaurant.findByIdAndUpdate(id, { status }, { new: true });
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+    res.status(200).json({ success: true, message: 'Status updated', data: { restaurant } });
+  } catch (error) {
+    next(error);
+  }
+};
+

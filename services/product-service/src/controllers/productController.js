@@ -1,139 +1,88 @@
 const Product = require('../models/Product');
 
-// @desc    Get all products
-// @route   GET /api/products
-// @access  Public
-exports.getAllProducts = async (req, res, next) => {
+// CREATE
+exports.createProduct = async (req, res) => {
   try {
-    const { category, restaurantId, search, available } = req.query;
-    
-    let query = {};
-    
-    if (category) query.category = category;
-    if (restaurantId) query.restaurantId = restaurantId;
-    if (available !== undefined) query.available = available === 'true';
-    if (search) query.$text = { $search: search };
+    const { name, description, price, category, restaurantId, image, available, preparationTime } = req.body;
 
-    const products = await Product.find(query).sort('-createdAt');
-    
-    res.status(200).json({
-      success: true,
-      count: products.length,
-      data: products
+    if (!name || !description || price === undefined || !category || !restaurantId) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+
+    const product = await Product.create({
+      name,
+      description,
+      price,
+      category,
+      restaurantId,
+      image,
+      available,
+      preparationTime
     });
-  } catch (error) {
-    next(error);
+
+    res.status(201).json({ success: true, data: product });
+  } catch (err) {
+    console.error('Create product error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Server error' });
   }
 };
 
-// @desc    Get single product
-// @route   GET /api/products/:id
-// @access  Public
-exports.getProduct = async (req, res, next) => {
+// LIST with optional filters
+exports.getProducts = async (req, res) => {
+  try {
+    const { restaurantId, category, available } = req.query;
+    const query = {};
+    if (restaurantId) query.restaurantId = restaurantId;
+    if (category) query.category = category;
+    if (available !== undefined) query.available = available === 'true';
+
+    const products = await Product.find(query).sort({ createdAt: -1 });
+    res.status(200).json({ success: true, count: products.length, data: products });
+  } catch (err) {
+    console.error('Get products error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+};
+
+// DETAIL
+exports.getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
-    
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product not found'
-      });
-    }
-    
-    res.status(200).json({
-      success: true,
-      data: product
-    });
-  } catch (error) {
-    next(error);
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+    res.status(200).json({ success: true, data: product });
+  } catch (err) {
+    console.error('Get product error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
   }
 };
 
-// @desc    Create product
-// @route   POST /api/products
-// @access  Private (Restaurant Owner)
-exports.createProduct = async (req, res, next) => {
+// UPDATE
+exports.updateProduct = async (req, res) => {
   try {
-    const product = await Product.create(req.body);
-    
-    res.status(201).json({
-      success: true,
-      data: product
-    });
-  } catch (error) {
-    next(error);
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+
+    const fields = ['name','description','price','category','image','available','preparationTime'];
+    fields.forEach(f => { if (req.body[f] !== undefined) product[f] = req.body[f]; });
+
+    await product.save();
+    res.status(200).json({ success: true, message: 'Product updated', data: product });
+  } catch (err) {
+    console.error('Update product error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Server error' });
   }
 };
 
-// @desc    Update product
-// @route   PUT /api/products/:id
-// @access  Private (Restaurant Owner)
-exports.updateProduct = async (req, res, next) => {
+// DELETE
+exports.deleteProduct = async (req, res) => {
   try {
-    const product = await Product.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      {
-        new: true,
-        runValidators: true
-      }
-    );
-    
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product not found'
-      });
-    }
-    
-    res.status(200).json({
-      success: true,
-      data: product
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
 
-// @desc    Delete product
-// @route   DELETE /api/products/:id
-// @access  Private (Restaurant Owner)
-exports.deleteProduct = async (req, res, next) => {
-  try {
-    const product = await Product.findByIdAndDelete(req.params.id);
-    
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product not found'
-      });
-    }
-    
-    res.status(200).json({
-      success: true,
-      message: 'Product deleted successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Get products by restaurant
-// @route   GET /api/products/restaurant/:restaurantId
-// @access  Public
-exports.getProductsByRestaurant = async (req, res, next) => {
-  try {
-    const products = await Product.find({ 
-      restaurantId: req.params.restaurantId,
-      available: true 
-    });
-    
-    res.status(200).json({
-      success: true,
-      count: products.length,
-      data: products
-    });
-  } catch (error) {
-    next(error);
+    await product.deleteOne();
+    res.status(200).json({ success: true, message: 'Product deleted' });
+  } catch (err) {
+    console.error('Delete product error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Server error' });
   }
 };

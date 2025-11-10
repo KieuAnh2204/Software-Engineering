@@ -13,15 +13,13 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ message: 'Not authorized, no token' });
     }
 
-    // Verify token
+    // Verify token (user-service signs payload { id })
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Attach user info from token to request
+    // Attach minimal user info expected by controllers
     req.user = {
       id: decoded.id,
-      username: decoded.username,
-      email: decoded.email,
-      role: decoded.role
+      _id: decoded.id
     };
 
     next();
@@ -34,9 +32,9 @@ const authenticate = async (req, res, next) => {
 // Check user roles
 const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
+    if (!req.user || !req.user.role || !roles.includes(req.user.role)) {
       return res.status(403).json({ 
-        message: `Role '${req.user.role}' is not authorized to access this route` 
+        message: `Not authorized to access this route` 
       });
     }
     next();
