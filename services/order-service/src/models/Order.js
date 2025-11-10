@@ -1,76 +1,43 @@
 const mongoose = require('mongoose');
 
-const orderSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: [true, 'User ID is required']
-  },
-  restaurantId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: [true, 'Restaurant ID is required']
-  },
-  items: [{
-    productId: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: true
-    },
-    name: {
+// Keep string IDs and snake_case to match existing DB patterns
+const OrderSchema = new mongoose.Schema(
+  {
+    order_id: { type: String, required: true, unique: true, index: true },
+    customer_id: { type: String, required: true, index: true },
+    restaurant_id: { type: String, required: true, index: true },
+    cart_id: { type: String },
+    note: { type: String },
+    total_amount: { type: Number, required: true, min: [0, 'Total cannot be negative'] },
+    status: {
       type: String,
-      required: true
+      enum: ['Pending', 'Processing', 'Delivering', 'Completed', 'Cancelled'],
+      default: 'Pending',
+      index: true
     },
-    quantity: {
-      type: Number,
-      required: true,
-      min: [1, 'Quantity must be at least 1']
-    },
-    price: {
-      type: Number,
-      required: true,
-      min: [0, 'Price cannot be negative']
+    created_at: { type: Date, default: Date.now, index: true },
+    meta: {
+      payment: {
+        payment_id: { type: String },
+        provider: { type: String },
+        last_status: { type: String },
+        checkout_url: { type: String },
+        qr_data: { type: String },
+        last_updated_at: { type: Date }
+      },
+      webhook: {
+        last_signature: { type: String },
+        last_payload_hash: { type: String }
+      }
     }
-  }],
-  totalAmount: {
-    type: Number,
-    required: [true, 'Total amount is required'],
-    min: [0, 'Total amount cannot be negative']
   },
-  deliveryAddress: {
-    street: { type: String, required: true },
-    city: { type: String, required: true },
-    state: { type: String, required: true },
-    zipCode: { type: String, required: true },
-    phone: { type: String, required: true }
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'],
-    default: 'pending'
-  },
-  paymentStatus: {
-    type: String,
-    enum: ['pending', 'completed', 'failed', 'refunded'],
-    default: 'pending'
-  },
-  paymentId: {
-    type: mongoose.Schema.Types.ObjectId,
-    default: null
-  },
-  estimatedDeliveryTime: {
-    type: Date
-  },
-  deliveredAt: {
-    type: Date
-  },
-  notes: {
-    type: String,
-    maxlength: [500, 'Notes cannot exceed 500 characters']
-  }
-}, {
-  timestamps: true
-});
+  { versionKey: false }
+);
 
-// Index for faster queries
-orderSchema.index({ userId: 1, createdAt: -1 });
-orderSchema.index({ restaurantId: 1, status: 1 });
+// Indexes per spec
+OrderSchema.index({ customer_id: 1, created_at: -1 });
+OrderSchema.index({ restaurant_id: 1, status: 1 });
+OrderSchema.index({ status: 1 });
+OrderSchema.index({ created_at: -1 });
 
-module.exports = mongoose.model('Order', orderSchema);
+module.exports = mongoose.model('Order', OrderSchema);

@@ -1,0 +1,170 @@
+{
+  "info": {
+    "name": "Order Service API",
+    "_postman_id": "8b3d7b56-87f5-4f0e-9a45-66b2a4a6f1c9",
+    "description": "Postman collection for Order Service endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3002" },
+    { "key": "customer_token", "value": "" },
+    { "key": "restaurant_token", "value": "" },
+    { "key": "admin_token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "POST /api/orders - Create Order (customer)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json", "type": "text" },
+          { "key": "Authorization", "value": "Bearer {{customer_token}}", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customer_id\": \"C123\",\n  \"restaurant_id\": \"R456\",\n  \"items\": [\n    { \"dish_id\": \"D1\", \"quantity\": 2 },\n    { \"dish_id\": \"D2\", \"quantity\": 1 }\n  ],\n  \"note\": \"no chili please\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/orders",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "GET /api/orders/:id - Get Order By ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Content-Type", "value": "application/json", "type": "text" },
+          { "key": "Authorization", "value": "Bearer {{customer_token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/orders/{{order_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders", "{{order_id}}"]
+        },
+        "description": "Replace {{order_id}} with an actual order id (e.g., ord_123)."
+      },
+      "response": []
+    },
+    {
+      "name": "GET /api/orders - List Orders (filters)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Content-Type", "value": "application/json", "type": "text" },
+          { "key": "Authorization", "value": "Bearer {{customer_token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/orders?customer_id=C123&status=Pending&page=1&limit=20",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders"],
+          "query": [
+            { "key": "customer_id", "value": "C123" },
+            { "key": "status", "value": "Pending" },
+            { "key": "page", "value": "1" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "POST /api/orders/:id/pay - Create VNPay Intent",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json", "type": "text" },
+          { "key": "Authorization", "value": "Bearer {{customer_token}}", "type": "text" }
+        ],
+        "body": { "mode": "raw", "raw": "{}" },
+        "url": {
+          "raw": "{{base_url}}/api/orders/{{order_id}}/pay",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders", "{{order_id}}", "pay"]
+        },
+        "description": "Replace {{order_id}} with an actual order id (e.g., ord_123)."
+      },
+      "response": []
+    },
+    {
+      "name": "POST /api/orders/payment/webhook/vnpay - Payment Webhook (signed)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderId\": \"ord_123\",\n  \"status\": \"Success\",\n  \"amount\": 250000,\n  \"paymentId\": \"pay_abc123\",\n  \"signature\": \"replace_with_hmac_signature\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/orders/payment/webhook/vnpay",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders", "payment", "webhook", "vnpay"]
+        },
+        "description": "Webhook callback from payment service. The signature must be a valid HMAC of the payload."
+      },
+      "response": []
+    },
+    {
+      "name": "POST /api/orders/:id/restaurant-confirm - Processing → Delivering",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json", "type": "text" },
+          { "key": "Authorization", "value": "Bearer {{restaurant_token}}", "type": "text" }
+        ],
+        "body": { "mode": "raw", "raw": "{}" },
+        "url": {
+          "raw": "{{base_url}}/api/orders/{{order_id}}/restaurant-confirm",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders", "{{order_id}}", "restaurant-confirm"]
+        },
+        "description": "Replace {{order_id}} with an actual order id (e.g., ord_123)."
+      },
+      "response": []
+    },
+    {
+      "name": "POST /api/orders/:id/complete - Delivering → Completed",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json", "type": "text" },
+          { "key": "Authorization", "value": "Bearer {{restaurant_token}}", "type": "text" }
+        ],
+        "body": { "mode": "raw", "raw": "{}" },
+        "url": {
+          "raw": "{{base_url}}/api/orders/{{order_id}}/complete",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders", "{{order_id}}", "complete"]
+        },
+        "description": "Replace {{order_id}} with an actual order id (e.g., ord_123)."
+      },
+      "response": []
+    },
+    {
+      "name": "POST /api/orders/:id/cancel - Cancel Order",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json", "type": "text" },
+          { "key": "Authorization", "value": "Bearer {{customer_token}}", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"Customer requested cancellation\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/orders/{{order_id}}/cancel",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders", "{{order_id}}", "cancel"]
+        },
+        "description": "Replace {{order_id}} with an actual order id (e.g., ord_123)."
+      },
+      "response": []
+    }
+  ]
+}

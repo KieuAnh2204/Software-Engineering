@@ -1,26 +1,32 @@
 const express = require('express');
 const router = express.Router();
+const { authenticate, authorize } = require('../middleware/auth');
+const { createOrderValidation, listOrdersValidation } = require('../validators/orderValidators');
 const {
-  getAllOrders,
-  getOrder,
   createOrder,
-  updateOrderStatus,
-  cancelOrder,
-  getUserOrders,
-  getRestaurantOrders
+  getOrderById,
+  listOrders,
+  createPaymentIntent,
+  vnpayWebhook,
+  restaurantConfirm,
+  completeOrder,
+  cancelOrder
 } = require('../controllers/orderController');
 
-router.route('/')
-  .get(getAllOrders)
-  .post(createOrder);
+// Create order (customer auth required)
+router.post('/', authenticate, createOrderValidation, createOrder);
 
-router.route('/:id')
-  .get(getOrder);
+// Read
+router.get('/:id', authenticate, getOrderById);
+router.get('/', authenticate, listOrdersValidation, listOrders);
 
-router.put('/:id/status', updateOrderStatus);
-router.put('/:id/cancel', cancelOrder);
+// Payments
+router.post('/:id/pay', authenticate, createPaymentIntent);
+router.post('/payment/webhook/vnpay', vnpayWebhook); // called by payment-service
 
-router.get('/user/:userId', getUserOrders);
-router.get('/restaurant/:restaurantId', getRestaurantOrders);
+// Restaurant actions
+router.post('/:id/restaurant-confirm', authenticate, authorize('restaurant', 'restaurantBrand', 'admin'), restaurantConfirm);
+router.post('/:id/complete', authenticate, completeOrder);
+router.post('/:id/cancel', authenticate, cancelOrder);
 
 module.exports = router;
