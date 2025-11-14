@@ -1,149 +1,284 @@
-﻿import { validationResult } from 'express-validator';
-import Customer from '../models/Customer.js';
-import RestaurantBrand from '../models/RestaurantBrand.js';
-import Restaurant from '../models/Restaurant.js';
+import { validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
+import User from '../models/User.js';
+import Customer from '../models/Customer.js';
+import RestaurantOwner from '../models/RestaurantOwner.js';
+import Admin from '../models/Admin.js';
 
-const generateToken = (userId) => jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE || '7d' });
+const generateToken = (user) =>
+  jwt.sign(
+    { id: user._id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRE || '7d' }
+  );
 
-// Register Customer
+const sanitizeUser = (userDoc) => {
+  const obj = userDoc.toObject();
+  delete obj.password;
+  return obj;
+};
+
+/* ======================================================
+    Ensure Customer Profile
+   ====================================================== */
+const ensureCustomerProfile = async ({ userId, profile = {} }) => {
+  let existing = await Customer.findOne({ user: userId });
+  if (existing) return existing;
+
+  return Customer.create({
+    user: userId,
+    full_name: profile.full_name || '',
+    phone: profile.phone || '',
+    address: profile.address || ''
+  });
+};
+
+/* ======================================================
+    Ensure Owner Profile
+   ====================================================== */
+const ensureOwnerProfile = async ({ userId, profile = {} }) => {
+  let existing = await RestaurantOwner.findOne({ user: userId });
+  if (existing) return existing;
+
+  return RestaurantOwner.create({
+    user: userId,
+    display_name: profile.name || '',
+    logo_url: profile.logo_url || null,
+    phone: profile.phone || '',
+    address: profile.address || ''
+  });
+};
+
+/* ======================================================
+    Check Email / Username Duplication
+   ====================================================== */
+const handleUniqueCredentialCheck = async (email, username) => {
+  const existing = await User.findOne({ $or: [{ email }, { username }] });
+  if (existing) {
+    const error = new Error('Email or username already exists');
+    error.statusCode = 400;
+    throw error;
+  }
+};
+
+/* ======================================================
+    Create Customer (User + Profile)
+   ====================================================== */
+const createCustomerAccount = async ({ email, password, username, full_name, phone, address }) => {
+  await handleUniqueCredentialCheck(email, username);
+
+  const user = await User.create({
+    email,
+    password,
+    username,
+    role: 'customer'
+  });
+
+  const customer = await ensureCustomerProfile({
+    userId: user._id,
+    profile: { full_name, phone, address }
+  });
+
+  return { user, customer };
+};
+
+/* ======================================================
+    Create Owner (User + Profile)
+   ====================================================== */
+const createOwnerAccount = async ({ email, password, username, name, logo_url, phone, address }) => {
+  await handleUniqueCredentialCheck(email, username);
+
+  const user = await User.create({
+    email,
+    password,
+    username,
+    role: 'owner'
+  });
+
+  const owner = await ensureOwnerProfile({
+    userId: user._id,
+    profile: { name, logo_url, phone, address }
+  });
+
+  return { user, owner };
+};
+
+const respondWithAuthPayload = (res, user, profileKey, profileValue, message, status = 201) => {
+  const token = generateToken(user);
+  res.status(status).json({
+    success: true,
+    message,
+    token,
+    user: sanitizeUser(user),
+    [profileKey]: profileValue
+  });
+};
+
+/* ======================================================
+    REGISTER CUSTOMER
+   ====================================================== */
+// controllers/authController.js
 export const registerCustomer = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     const { email, password, username, full_name, phone, address } = req.body;
+    await handleUniqueCredentialCheck(email, username);
 
-    if (await Customer.findOne({ email })) return res.status(400).json({ success: false, message: 'Email already exists' });
-    if (await Customer.findOne({ username })) return res.status(400).json({ success: false, message: 'Username already exists' });
+    // Try to use a MongoDB transaction (requires replica set / Atlas)
+    let session;
+    try {
+      session = await mongoose.startSession();
+    } catch (err) {
+      session = null;
+    }
 
-  const customer = await Customer.create({ email, password, username, full_name, phone, address: address || '' });
-  const token = generateToken(customer._id);
+    if (session) {
+      let userDoc, customerDoc;
+      try {
+        session.startTransaction();
 
-    res.status(201).json({ success: true, message: 'Customer registered successfully', data: { customer: customer.toJSON(), token } });
-  } catch (error) { next(error); }
+        const createdUsers = await User.create([
+          { email, password, username, role: 'customer' }
+        ], { session });
+        userDoc = createdUsers[0];
+
+        const createdCustomers = await Customer.create([
+          { user: userDoc._id, full_name, phone, address: address || '' }
+        ], { session });
+        customerDoc = createdCustomers[0];
+
+        await session.commitTransaction();
+        session.endSession();
+
+        respondWithAuthPayload(res, userDoc, 'customer', customerDoc, 'Customer registered successfully');
+        return;
+      } catch (err) {
+        await session.abortTransaction();
+        session.endSession();
+        // rethrow to outer handler
+        throw err;
+      }
+    }
+
+    // Fallback (no transaction support) - create user then customer and cleanup on failure
+    const user = await User.create({ email, password, username, role: 'customer' });
+    try {
+      const customer = await Customer.create({
+        user: user._id,
+        full_name,
+        phone,
+        address: address || ''
+      });
+      respondWithAuthPayload(res, user, 'customer', customer, 'Customer registered successfully');
+      return;
+    } catch (err) {
+      // attempt cleanup of orphaned user
+      try {
+        await User.findByIdAndDelete(user._id);
+      } catch (cleanupErr) {
+        // log cleanup failure but continue to propagate original error
+        console.error('Failed to cleanup user after customer creation error', cleanupErr);
+      }
+      throw err;
+    }
+  } catch (error) {
+    next(error);
+  }
 };
 
-// Register Restaurant Brand (owner account)
-export const registerRestaurant = async (req, res, next) => {
+
+/* ======================================================
+    REGISTER OWNER
+   ====================================================== */
+export const registerRestaurantOwner = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { email, password, username, name, logo_url } = req.body;
-    if (await RestaurantBrand.findOne({ email })) return res.status(400).json({ success: false, message: 'Email already exists' });
-    if (await RestaurantBrand.findOne({ username })) return res.status(400).json({ success: false, message: 'Username already exists' });
-
-  const brand = await RestaurantBrand.create({ email, password, username, name, logo_url: logo_url || null, status: 'PENDING' });
-  const token = generateToken(brand._id);
-
-    res.status(201).json({ success: true, message: 'Restaurant owner registered successfully', data: { restaurantBrand: brand.toJSON(), token } });
-  } catch (error) { next(error); }
+    const { user, owner } = await createOwnerAccount(req.body);
+    respondWithAuthPayload(res, user, 'owner', owner, 'Restaurant owner registered successfully');
+  } catch (error) {
+    next(error);
+  }
 };
 
-// Login Customer only
+/* ======================================================
+    GENERIC REGISTER
+   ====================================================== */
+export const register = async (req, res, next) => {
+  try {
+    if (req.body.role === 'admin') {
+      return res.status(403).json({
+        message: 'Admin cannot register via API. Contact system administrator.'
+      });
+    }
+
+    if (!['customer', 'owner'].includes(req.body.role)) {
+      return res.status(403).json({
+        message: 'Invalid role. Allowed roles: customer, owner'
+      });
+    }
+
+    if (req.body.role === 'customer') {
+      return registerCustomer(req, res, next);
+    }
+    return registerRestaurantOwner(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/* ======================================================
+    LOGIN CUSTOMER
+   ====================================================== */
 export const loginCustomer = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
     const { email, password } = req.body;
 
-  const user = await Customer.findOne({ email }).select('+password');
-  const userType = 'customer';
-  if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    const user = await User.findOne({ email, role: 'customer' }).select('+password');
+    if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
     const match = await user.comparePassword(password);
-    if (!match) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    if (!match) return res.status(401).json({ message: 'Invalid credentials' });
 
-  const token = generateToken(user._id);
-    const baseUser = user.toJSON();
-    res.status(200).json({ success: true, message: 'Login successful', data: { user: { ...baseUser, userType }, token } });
-  } catch (error) { next(error); }
+    await User.findByIdAndUpdate(user._id, { lastLogin: new Date() });
+
+    const customer = await ensureCustomerProfile({ userId: user._id });
+
+    respondWithAuthPayload(res, user, 'customer', customer, 'Login successful', 200);
+  } catch (error) {
+    next(error);
+  }
 };
 
-// Login Restaurant Brand only
-export const loginRestaurant = async (req, res, next) => {
+/* ======================================================
+    LOGIN OWNER
+   ====================================================== */
+export const loginRestaurantOwner = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
     const { email, password } = req.body;
 
-    const user = await RestaurantBrand.findOne({ email }).select('+password');
-    const userType = 'restaurantBrand';
-    if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    const user = await User.findOne({ email, role: 'owner' }).select('+password');
+    if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
     const match = await user.comparePassword(password);
-    if (!match) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    if (!match) return res.status(401).json({ message: 'Invalid credentials' });
 
-    const token = generateToken(user._id);
-    const baseUser = user.toJSON();
-    res.status(200).json({ success: true, message: 'Login successful', data: { user: { ...baseUser, userType }, token } });
-  } catch (error) { next(error); }
-};
+    await User.findByIdAndUpdate(user._id, { lastLogin: new Date() });
 
-// Get profile endpoints
-export const getCustomerMe = async (req, res, next) => {
-  try {
-    if (req.user.type !== 'customer') return res.status(403).json({ success: false, message: 'Access denied' });
-    const user = await Customer.findById(req.user.id);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    res.status(200).json({ success: true, data: user });
-  } catch (error) { next(error); }
-};
+    const owner = await ensureOwnerProfile({ userId: user._id });
 
-export const getBrandMe = async (req, res, next) => {
-  try {
-    if (req.user.type !== 'restaurantBrand') return res.status(403).json({ success: false, message: 'Access denied' });
-    const brand = await RestaurantBrand.findById(req.user.id);
-    if (!brand) return res.status(404).json({ success: false, message: 'User not found' });
-    const restaurants = await Restaurant.find({ brand_id: req.user.id });
-    const user = { ...brand.toJSON(), restaurants };
-    res.status(200).json({ success: true, data: user });
-  } catch (error) { next(error); }
-};
-
-// Brand submits a restaurant under its brand id
-export const createRestaurantUnderBrand = async (req, res, next) => {
-  try {
-    if (req.user.type !== 'restaurantBrand') return res.status(403).json({ success: false, message: 'Only restaurant owners can create restaurants' });
-    const { brandId } = req.params;
-    if (req.user.id !== brandId) return res.status(403).json({ success: false, message: 'Cannot create restaurant for another brand' });
-    const brand = await RestaurantBrand.findById(brandId);
-    if (!brand) return res.status(404).json({ success: false, message: 'Restaurant brand not found' });
-
-    const { name, address, phone, restaurant_id } = req.body;
-    const restaurant = await Restaurant.create({ name, address, phone, restaurant_id, brand_id: brandId, status: 'PENDING' });
-    res.status(201).json({ success: true, message: 'Restaurant created successfully', data: { restaurant } });
-  } catch (error) { next(error); }
-};
-
-// Get restaurants owned by the brand owner
-export const getMyRestaurants = async (req, res, next) => {
-  try {
-    if (req.user.type !== 'restaurantBrand') return res.status(403).json({ success: false, message: 'Access denied' });
-    const restaurants = await Restaurant.find({ brand_id: req.user.id });
-    res.status(200).json({ success: true, data: { count: restaurants.length, restaurants } });
+    respondWithAuthPayload(res, user, 'owner', owner, 'Login successful', 200);
   } catch (error) {
     next(error);
   }
 };
-
-// Admin: update restaurant status (exported for restaurantRoutes)
-export const updateRestaurantStatus = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-    const allowed = ['APPROVED', 'REJECTED', 'CLOSED'];
-    if (!allowed.includes(status)) {
-      return res.status(400).json({ success: false, message: `Invalid status. Allowed: ${allowed.join(', ')}` });
-    }
-    const restaurant = await Restaurant.findByIdAndUpdate(id, { status }, { new: true });
-    if (!restaurant) {
-      return res.status(404).json({ success: false, message: 'Restaurant not found' });
-    }
-    res.status(200).json({ success: true, message: 'Status updated', data: { restaurant } });
-  } catch (error) {
-    next(error);
-  }
-};
-

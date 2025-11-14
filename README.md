@@ -1,648 +1,267 @@
-# 🍔 FoodFast Delivery - Microservices Platform
+# FoodFast Delivery – Microservices Architecture
+> A scalable, cloud-native microservices platform for online food ordering.
 
-> Hệ thống đặt đồ ăn trực tuyến với kiến trúc Microservices, MongoDB Atlas, Docker và React
-
-## 📋 Mục Lục
-- [Tổng Quan](#-tổng-quan)
-- [Quick Start](#-quick-start)
-- [Kiến Trúc Hệ Thống](#️-kiến-trúc-hệ-thống)
-- [Backend Services](#-backend-services)
-- [Frontend](#-frontend)
-- [Database](#-database)
-- [Authentication](#-authentication)
-- [Documentation](#-documentation)
-- [Testing](#-testing)
-
----
-
-## 🎯 Tổng Quan
-
-FoodFast Delivery là nền tảng đặt đồ ăn trực tuyến được xây dựng theo kiến trúc Microservices với các tính năng:
-
-### ✨ Tính Năng Chính
-
-**👥 Customer (Khách hàng):**
-- Đăng ký/Đăng nhập với JWT authentication
-- Tìm kiếm và xem menu nhà hàng
-- Thêm món vào giỏ hàng
-- Đặt hàng và thanh toán
-- Theo dõi đơn hàng
-
-**🏪 Restaurant Owner (Chủ nhà hàng):**
-- Dashboard quản lý nhà hàng
-- ✅ **CRUD món ăn** (Thêm/Sửa/Xóa món)
-- Quản lý đơn hàng
-- Cập nhật trạng thái món ăn (available/unavailable)
-- Quản lý hình ảnh món ăn
-
-**👨‍💼 Admin (Quản trị viên):**
-- Dashboard tổng quan hệ thống
-- Quản lý users (activate/deactivate, soft delete)
-- Quản lý nhà hàng (verify, approve)
-- Quản lý đơn hàng
-- Xem activity logs và system logs
+## 📚 Table of Contents
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Screenshots (placeholder)](#screenshots-placeholder)
+- [Prerequisites](#prerequisites)
+- [Repository Layout](#repository-layout)
+- [Environment Variables](#environment-variables)
+- [Running Locally with Docker Compose](#running-locally-with-docker-compose)
+- [Running on Kubernetes](#running-on-kubernetes)
+- [Microservices & Endpoints](#microservices--endpoints)
+- [Frontend Setup](#frontend-setup)
+- [Testing & Linting](#testing--linting)
+- [Troubleshooting](#troubleshooting)
+- [Demo & Submission](#demo--submission)
 
 ---
 
-## 🚀 Quick Start
+## Overview
+FoodFast Delivery is a cloud-native, domain-driven platform for online food ordering. It supports three core personas:
+- **Customer** – browses menus, places orders, tracks status.
+- **Restaurant Owner** – manages restaurants and dishes.
+- **Super Admin** – governs the entire platform.
 
-### 1️⃣ Backend Services (Docker)
+| Service | Responsibility | Port |
+| --- | --- | --- |
+| **User Service** | Authentication, Customer and Restaurant Owner identities, Super Admin management | `3001` |
+| **Product Service** | Restaurant and Dish lifecycle, availability, ownership (no brand concept) | `3003` |
+| **Order Service** | Orders and Order Items workflow, status tracking | `3002` |
+| **Payment Service** | VNPay integration, payment callbacks, transaction logs | `3004` |
+| **Frontend** | React UI for Customers, Owners, Super Admin | `3000` |
 
-```powershell
-# Start all microservices
-.\docker-manager.ps1 start
-
-# Check status
-.\docker-manager.ps1 status
-
-# View logs
-.\docker-manager.ps1 logs
-
-# Stop all services
-.\docker-manager.ps1 stop
-```
-
-**✅ Services Running:**
-```bash
-User Service:    http://localhost:3001 ✅
-Order Service:   http://localhost:3002 ✅
-Product Service: http://localhost:3003 ✅
-Payment Service: http://localhost:3004 ✅
-```
-
-### 2️⃣ Frontend (React + Vite)
-
-```powershell
-# Navigate to frontend
-cd frontend/Users
-
-# Install dependencies (first time only)
-npm install
-
-# Start development server
-$env:PORT="5173"
-npm run dev
-```
-
-**✅ Frontend Running:**
-```bash
-Frontend:        http://localhost:5173 ✅
-Owner Login:     http://localhost:5173/owner/login
-Admin Login:     http://localhost:5173/admin/login
-```
-
-### 3️⃣ Quick Test
-
-```powershell
-# Test backend health
-Invoke-RestMethod http://localhost:3001/health
-
-# Test Product Service for restaurants
-.\test-product-service.ps1
-
-# Test authentication
-# See CUSTOMER_AUTH_TESTING.md
-```
+**Service Interaction Diagram**
+- Customer/Owner/Super Admin → **Frontend** → API Gateway/Ingress → **User Service** for auth (`JWT`).
+- Frontend fetches restaurants/dishes from **Product Service**.
+- Checkout triggers **Order Service**, which emits events to **Payment Service**.
+- **Payment Service** communicates with **VNPay** and emits payment status events consumed by **Order Service**.
 
 ---
 
-## 🏗️ Kiến Trúc Hệ Thống
-
-```
-┌─────────────────────────────────────────────────┐
-│         FRONTEND (React + TypeScript)           │
-│              http://localhost:5173              │
-├─────────────────────────────────────────────────┤
-│  Customer UI  │  Restaurant Owner UI  │ Admin UI│
-└─────────────────────────────────────────────────┘
-                      │
-                      │ REST APIs (JWT Auth)
-                      ▼
-┌─────────────────────────────────────────────────┐
-│              MICROSERVICES (Docker)             │
-├───────────┬───────────┬───────────┬─────────────┤
-│   User    │  Product  │   Order   │   Payment   │
-│  Service  │  Service  │  Service  │  Service    │
-│  :3001    │  :3003    │  :3002    │   :3004     │
-├───────────┼───────────┼───────────┼─────────────┤
-│  MongoDB  │  MongoDB  │  MongoDB  │   MongoDB   │
-│    DB     │    DB     │    DB     │     DB      │
-└───────────┴───────────┴───────────┴─────────────┘
-                      │
-                      ▼
-              MongoDB Atlas Cloud
-           cluster0.r3lhqwd.mongodb.net
-```
-
-### 🔑 Design Patterns
-
-- **Microservices Architecture**: 4 services độc lập
-- **Database per Service**: Mỗi service có database riêng
-- **JWT Authentication**: Stateless authentication
-- **RESTful APIs**: Chuẩn REST cho tất cả endpoints
-- **Docker Containerization**: Đóng gói services
+## Architecture
+- **Microservices**: User, Product, Order, Payment.
+- **API Gateway / Ingress**: Optional gateway (Nginx/Ingress) routes client traffic to services.
+- **MongoDB Atlas**: Primary database for all services (separate databases per service).
+- **Message Broker**: Kafka or RabbitMQ (pluggable) transports events between Order and Payment services.
+- **Docker Compose**: Local orchestration of all services.
+- **Kubernetes Manifests**: `k8s/` folder contains deployment, service, and secret manifests.
+- **REST APIs + JWT Auth**: Stateless authentication issued by the User Service and verified by downstream services.
+- **Event-Driven Communication**: Orders publish payment events; Payment Service pushes payment confirmations back.
 
 ---
 
-## 🔧 Backend Services
-
-### 1. User Service (Port 3001)
-
-**Chức năng:**
-- ✅ Authentication (Register/Login) với JWT
-- ✅ Customer profile management
-- ✅ Restaurant profile management
-- ✅ Admin management (CRUD users, soft delete)
-- ✅ Account security (login tracking, account locking)
-
-**Endpoints:**
-```bash
-POST   /api/auth/register          # Đăng ký
-POST   /api/auth/login             # Đăng nhập (returns JWT)
-GET    /api/auth/profile           # Xem profile (JWT required)
-
-# Admin endpoints (admin only)
-GET    /api/admin/dashboard/stats  # Dashboard statistics
-GET    /api/admin/users            # List all users
-PUT    /api/admin/users/:id/status # Activate/deactivate user
-DELETE /api/admin/users/:id        # Soft delete user
-GET    /api/admin/restaurants      # List all restaurants
-PUT    /api/admin/restaurants/:id/verify  # Verify restaurant
-```
-
-**Models:**
-- User (with Customer/Restaurant/Admin profiles)
-
-### 2. Product Service (Port 3003) ⭐ NEW
-
-**Chức năng:**
-- ✅ **Restaurant owners quản lý món ăn** (CRUD)
-- ✅ Category management (Admin)
-- ✅ Image management
-- ✅ Public search and filtering
-- ✅ Ownership validation (chỉ sửa món của mình)
-
-**Endpoints:**
-
-**Public (No Auth):**
-```bash
-GET    /api/products                    # List all products (filter, search, pagination)
-GET    /api/products/search             # Advanced search
-GET    /api/products/restaurant/:id     # Products by restaurant
-GET    /api/products/:id                # Product detail
-```
-
-**Restaurant Only (JWT Required):**
-```bash
-POST   /api/products                    # Create product
-GET    /api/products/my-products/list   # My products
-PUT    /api/products/:id                # Update product (own only)
-DELETE /api/products/:id                # Delete product (own only)
-PATCH  /api/products/:id/availability   # Toggle available/unavailable
-PUT    /api/products/:id/images         # Update product images
-```
-
-**Models:**
-- Product (name, price, categoryId, restaurantId, images[], mainImage)
-- Category (name, slug, description, displayOrder)
-- Image (url, entityType, entityId, uploadedBy)
-
-### 3. Order Service (Port 3002)
-
-**Chức năng:**
-- Cart management
-- Order placement
-- Order tracking
-- Order history
-
-**Endpoints:**
-```bash
-POST   /api/orders              # Create order
-GET    /api/orders              # Get user orders
-GET    /api/orders/:id          # Get order detail
-PUT    /api/orders/:id/status   # Update order status
-```
-
-**Models:**
-- Order
-- Cart
-- OrderItem
-
-### 4. Payment Service (Port 3004)
-
-**Chức năng:**
-- Payment processing
-- VNPay integration
-- Payment verification
-- Refund handling
-
-**Endpoints:**
-```bash
-POST   /api/payments            # Process payment
-GET    /api/payments/:id        # Payment status
-POST   /api/payments/refund     # Refund payment
-```
+## Tech Stack
+| Layer | Technology |
+| --- | --- |
+| Frontend | React + Vite (SPA) |
+| Backend | Node.js, Express.js |
+| Database | MongoDB Atlas (Mongoose ODM) |
+| Authentication | JWT, bcrypt hashing |
+| Realtime | Socket.IO (optional notification channel) |
+| Payments | VNPay (official REST APIs) |
+| Message Broker | Kafka or RabbitMQ (pluggable) |
+| Containerization | Docker + Docker Compose |
+| Orchestration | Kubernetes |
+| API Documentation | Swagger/OpenAPI (Payment + shared docs) |
 
 ---
 
-## 💻 Frontend
-
-### Technology Stack
-- **Framework**: React 18 + TypeScript
-- **Build Tool**: Vite
-- **UI Library**: shadcn/ui + Tailwind CSS
-- **Routing**: Wouter
-- **State Management**: React Context + TanStack Query
-- **Forms**: React Hook Form + Zod validation
-
-### Pages Structure
-
-```
-Frontend (http://localhost:5173)
-├── / (Home)                          # Restaurant listing
-├── /restaurant/:id                   # Restaurant detail + Menu
-├── /cart                             # Shopping cart
-├── /checkout                         # Checkout page
-├── /login                            # Customer login
-├── /profile                          # Customer profile
-│
-├── /owner/login                      # Restaurant owner login
-├── /owner (Dashboard)                # Owner dashboard
-│   ├── Overview                      # Stats, revenue
-│   ├── Menu Management               # ⭐ CRUD món ăn
-│   ├── Order Management              # Pending/Ready orders
-│   └── Order History                 # Completed orders
-│
-└── /admin/login                      # Admin login
-    └── /admin (Dashboard)            # Admin dashboard
-        ├── Overview                  # System stats
-        ├── User Management           # Manage users
-        ├── Restaurant Management     # Manage restaurants
-        ├── Order Management          # All orders
-        └── Logs                      # Activity & system logs
-```
-
-### Components
-
-**Shared:**
-- Header, Hero, ThemeProvider, ThemeToggle
-- MenuItemCard, RestaurantCard
-- CartSheet, AddressConfirmationDialog
-- OrderStatusStepper
-
-**Owner:**
-- OwnerDashboardOverview
-- OwnerMenuManagement ⭐ (Add/Edit/Delete dishes)
-- OwnerOrderManagement
-- OwnerPendingOrders, OwnerReadyOrders
-
-**Admin:**
-- DashboardOverview
-- UserManagement
-- RestaurantManagement
-- MenuManagement (all restaurants)
-- OrderManagement
-- ActivityLogs, SystemLogs
+## Screenshots (placeholder)
+- Customer web dashboard – _coming soon_
+- Restaurant Owner console – _coming soon_
+- Super Admin console – _coming soon_
 
 ---
 
-## 🗄️ Database
-
-### MongoDB Atlas
-- **Cluster**: `cluster0.r3lhqwd.mongodb.net`
-- **User**: `foodfast_delivery`
-- **Connection**: MongoDB Atlas (Cloud)
-
-### Databases (4 separate DBs)
-
-```javascript
-// 1. user_service
-{
-  users: {
-    role: "customer" | "restaurant" | "admin",
-    customerProfile: {...},
-    restaurantProfile: {...},
-    isActive, isDeleted, loginAttempts, lockUntil
-  }
-}
-
-// 2. product_service ⭐ UPDATED
-{
-  products: {
-    name, description, price,
-    categoryId (ref Category),
-    restaurantId (ref User),
-    images[] (ref Image),
-    mainImage (ref Image),
-    ingredients[], allergens[],
-    spicyLevel, nutritionInfo,
-    available, displayOrder
-  },
-  categories: {
-    name, slug, description,
-    isActive, displayOrder
-  },
-  images: {
-    url, altText, entityType,
-    entityId, uploadedBy
-  }
-}
-
-// 3. order_service
-{
-  orders: {...},
-  carts: {...}
-}
-
-// 4. payment_service
-{
-  payments: {...}
-}
-```
-
-**Dashboard**: https://cloud.mongodb.com
+## Prerequisites
+- Node.js v16+
+- Docker Desktop & `docker-compose`
+- Kubernetes cluster with `kubectl`
+- MongoDB Atlas URI (per service or shared cluster)
+- VNPay API credentials (TMN Code, Hash Secret, Return URL)
 
 ---
 
-## 🔐 Authentication
-
-### JWT Token Structure
-
-```javascript
-{
-  id: userId,
-  role: "customer" | "restaurant" | "admin",
-  email: userEmail,
-  restaurantId: restaurantId  // For restaurant owners only
-}
-```
-
-### Security Features
-
-✅ **Password Hashing**: bcrypt (10 salt rounds)
-✅ **JWT Expiry**: 7 days
-✅ **Account Locking**: 5 failed attempts → 2 hours lock
-✅ **Login Tracking**: lastLogin, loginAttempts
-✅ **Soft Delete**: isDeleted flag instead of hard delete
-✅ **Role-Based Access**: protect + restrictTo middleware
-
-### Authentication Flow
-
-```
-1. Customer/Restaurant/Admin → POST /api/auth/register or /login
-2. Backend validates credentials
-3. Generate JWT token with user info (id, role, email, restaurantId)
-4. Frontend stores token
-5. All protected requests → Header: "Authorization: Bearer TOKEN"
-6. Backend middleware verifies JWT → extract user info → allow/deny
-```
-
----
-
-## 📚 Documentation
-
-### 🏪 Restaurant Flow (Luồng Chủ Nhà Hàng)
-- **[QUICK_START_RESTAURANT.md](QUICK_START_RESTAURANT.md)** ⚡ - Đăng ký nhà hàng trong 2 bước
-- **[FLOW_1_BRAND_MANAGER_README.md](FLOW_1_BRAND_MANAGER_README.md)** 📖 - Tài liệu đầy đủ
-- **[FLOW_1_DIAGRAM.md](FLOW_1_DIAGRAM.md)** 🎨 - Sơ đồ luồng và database
-
-### Setup Guides
-- **[START_SERVICES_GUIDE.md](START_SERVICES_GUIDE.md)** - Hướng dẫn khởi động services
-- **[DOCKER_MONGODB_SETUP.md](DOCKER_MONGODB_SETUP.md)** - Setup MongoDB Atlas
-- **[MONGODB_ATLAS_QUICK_START.md](MONGODB_ATLAS_QUICK_START.md)** - Quick setup MongoDB
-
-### API Documentation
-- **[services/README.md](services/README.md)** - Backend APIs overview
-- **[PRODUCT_SERVICE_GUIDE.md](PRODUCT_SERVICE_GUIDE.md)** ⭐ - Product Service chi tiết
-- **[PRODUCT_SERVICE_IMPLEMENTATION.md](PRODUCT_SERVICE_IMPLEMENTATION.md)** - Implementation details
-
-### Testing Guides
-- **[POSTMAN_FLOW1_GUIDE.md](POSTMAN_FLOW1_GUIDE.md)** 📮 - Test Flow 1 với Postman
-- **[Flow1_Restaurant_Menu.postman_collection.json](Flow1_Restaurant_Menu.postman_collection.json)** - Postman Collection
-- **[CUSTOMER_AUTH_TESTING.md](CUSTOMER_AUTH_TESTING.md)** - Test authentication
-- **[test-product-service.ps1](test-product-service.ps1)** - Test Product Service
-- **[POSTMAN_TESTING_GUIDE.md](POSTMAN_TESTING_GUIDE.md)** - Postman collection
-- **[POSTMAN_QUICK_START.md](POSTMAN_QUICK_START.md)** - Quick Postman setup
-
-### Architecture & Design
-- **[PRD_VS_SCHEMA_COMPARISON.md](PRD_VS_SCHEMA_COMPARISON.md)** - PRD vs Implementation
-- **[AUTH_CHANGES_SUMMARY.md](AUTH_CHANGES_SUMMARY.md)** - Authentication improvements
-- **[DATABASE_ISOLATION_ANALYSIS.md](DATABASE_ISOLATION_ANALYSIS.md)** 🔒 - Phân tích Database Isolation
-- **[DATABASE_ISOLATION_VISUAL.md](DATABASE_ISOLATION_VISUAL.md)** 🎨 - Hướng dẫn Database Isolation (Visual)
-
----
-
-## 🧪 Testing
-
-### 1. Test Backend Services
-
-```powershell
-# Health check all services
-Invoke-RestMethod http://localhost:3001/health  # User Service
-Invoke-RestMethod http://localhost:3002/health  # Order Service
-Invoke-RestMethod http://localhost:3003/health  # Product Service
-Invoke-RestMethod http://localhost:3004/health  # Payment Service
-
-# Test authentication
-.\test-auth.ps1
-
-# Test Product Service (Restaurant CRUD)
-.\test-product-service.ps1
-```
-
-### 2. Test Frontend
-
-**Open browser:**
-```
-Customer:         http://localhost:5173
-Owner Login:      http://localhost:5173/owner/login
-Admin Login:      http://localhost:5173/admin/login
-```
-
-**Test Accounts:**
-```javascript
-// Restaurant Owner
-username: "owner1"
-password: "password123"
-
-// Admin
-username: "admin"
-password: "admin123"
-
-// Customer (register new account)
-email: "customer@test.com"
-password: "password123"
-```
-
-### 3. Manual API Testing
-
-**Postman Collection:**
-- Import: `FoodFast_Delivery.postman_collection.json`
-- See: [POSTMAN_TESTING_GUIDE.md](POSTMAN_TESTING_GUIDE.md)
-
-**PowerShell Scripts:**
-```powershell
-# Register customer
-$body = @{
-    email = "test@customer.com"
-    password = "password123"
-    role = "customer"
-} | ConvertTo-Json
-
-Invoke-RestMethod -Uri "http://localhost:3001/api/auth/register" `
-    -Method Post -ContentType "application/json" -Body $body
-
-# Login and get token
-$loginBody = @{
-    email = "test@customer.com"
-    password = "password123"
-} | ConvertTo-Json
-
-$response = Invoke-RestMethod -Uri "http://localhost:3001/api/auth/login" `
-    -Method Post -ContentType "application/json" -Body $loginBody
-
-$token = $response.data.token
-
-# Use token for protected endpoints
-$headers = @{ "Authorization" = "Bearer $token" }
-Invoke-RestMethod -Uri "http://localhost:3001/api/auth/profile" `
-    -Method Get -Headers $headers
-```
-
----
-
-## 🛠️ Development
-
-### Prerequisites
-- Node.js 18+
-- Docker Desktop
-- MongoDB Atlas account
-- PowerShell (for scripts)
-
-### Project Structure
-
+## Repository Layout
 ```
 Software-Engineering/
-├── frontend/
-│   └── Users/                    # React frontend
-│       ├── src/
-│       │   ├── components/       # UI components
-│       │   ├── pages/            # Route pages
-│       │   ├── contexts/         # Auth contexts
-│       │   └── lib/              # Utils
-│       └── server/               # Backend proxy
-│
-├── services/
-│   ├── user-service/             # Port 3001
-│   │   ├── src/
-│   │   │   ├── models/           # User model
-│   │   │   ├── controllers/      # Auth, Admin
-│   │   │   ├── middleware/       # Auth middleware
-│   │   │   └── routes/           # API routes
-│   │   └── Dockerfile
-│   │
-│   ├── product-service/          # Port 3003 ⭐
-│   │   ├── src/
-│   │   │   ├── models/           # Product, Category, Image
-│   │   │   ├── controllers/      # Product CRUD
-│   │   │   ├── middleware/       # Auth, Ownership
-│   │   │   └── routes/           # Public + Protected routes
-│   │   └── Dockerfile
-│   │
-│   ├── order-service/            # Port 3002
-│   └── payment-service/          # Port 3004
-│
-├── docker-compose.yml            # All services
-├── docker-manager.ps1            # Management script
-└── *.md                          # Documentation
+├─ services/
+│  ├─ user-service/
+│  │  └─ src/
+│  ├─ product-service/
+│  │  └─ src/
+│  ├─ order-service/
+│  │  └─ src/
+│  └─ payment-service/
+│     └─ src/
+├─ frontend/
+│  └─ Users/                # React SPA source
+├─ k8s/
+│  ├─ deployment.yaml
+│  ├─ service.yaml
+│  └─ secrets.yaml
+├─ docker-compose.yml
+└─ README.md
 ```
 
-### Environment Variables
+---
 
-**Backend Services (.env):**
+## Environment Variables
 ```env
-PORT=300X
-MONGODB_URI=mongodb+srv://...
-JWT_SECRET=your_secret_key
-JWT_EXPIRE=7d
-NODE_ENV=development
+# MongoDB
+MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/foodfast
+
+# User Service
+PORT=3001
+JWT_SECRET=super-secret-key
+JWT_EXPIRES_IN=7d
+
+# Product Service
+PORT=3003
+
+# Order Service
+PORT=3002
+
+# Payment Service
+PORT=3004
+VNPAY_TMN_CODE=YOUR_TMN_CODE
+VNPAY_HASH_SECRET=YOUR_HASH_SECRET
+VNPAY_RETURN_URL=https://your-domain.com/payment/callback
+
+# Frontend
+REACT_APP_BACKEND_URL=http://localhost:3001
 ```
 
-**Frontend (.env):**
-```env
-PORT=5173
-VITE_API_URL=http://localhost
+Each service can extend this template with service-specific variables (e.g., queue endpoints, logging).
+
+---
+
+## Running Locally with Docker Compose
+```bash
+docker-compose up --build
+docker-compose down
 ```
 
----
+**Default Ports**
+- User Service `3001`
+- Order Service `3002`
+- Product Service `3003`
+- Payment Service `3004`
+- Frontend `3000`
 
-## 🚧 Roadmap
+**Seed Super Admin (run once per environment)**
+```bash
+cd services/user-service
+node src/seedAdmin.js
+```
 
-### ✅ Completed
-- [x] User Service with JWT authentication
-- [x] Admin Dashboard backend (user/restaurant management)
-- [x] Product Service with Restaurant CRUD
-- [x] Category and Image models
-- [x] Account security (locking, tracking)
-- [x] Frontend UI (Customer, Owner, Admin)
-- [x] Docker containerization
-
-### 🔜 Next Steps
-1. **Category Service** (Admin CRUD categories)
-2. **Image Upload** (Restaurant upload dish images)
-3. **Order Service** (Complete cart & checkout)
-4. **Payment Integration** (VNPay)
-5. **Real-time Notifications** (WebSocket)
-6. **Unit Tests** (Jest + Supertest)
+Within the containers, services connect to MongoDB using `MONGO_URI` defined in `.env` or Docker secrets.
 
 ---
 
-## 📞 Support
+## Running on Kubernetes
+```bash
+kubectl apply -f k8s/secrets.yaml
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
 
-### Issues?
+kubectl get pods
+kubectl get svc
+```
 
-1. **Services not starting?**
-   ```powershell
-   docker-compose down
-   docker-compose build
-   docker-compose up -d
-   ```
-
-2. **Frontend not loading?**
-   ```powershell
-   cd frontend/Users
-   npm install
-   $env:PORT="5173"
-   npm run dev
-   ```
-
-3. **MongoDB connection error?**
-   - Check MongoDB Atlas IP whitelist (allow 0.0.0.0/0)
-   - Verify connection string in `.env`
-
-4. **Authentication not working?**
-   - Check JWT_SECRET in all `.env` files
-   - Ensure same secret across all services
-
-### Documentation
-- API Docs: `services/README.md`
-- Product Service: `PRODUCT_SERVICE_GUIDE.md`
-- Testing: `CUSTOMER_AUTH_TESTING.md`
+- `secrets.yaml`: stores sensitive data (JWT secret, VNPay credentials, Mongo URIs).
+- `deployment.yaml`: defines Deployments for all microservices and the frontend.
+- `service.yaml`: exposes Deployments internally/externally (ClusterIP, NodePort, or LoadBalancer).
 
 ---
 
-## 👥 Contributors
+## Microservices & Endpoints
 
-- **Team**: Software Engineering
-- **Project**: FoodFast Delivery
-- **Date**: October 2025
+### User Service (Port 3001)
+| Endpoint | Method | Description | Auth |
+| --- | --- | --- | --- |
+| `/api/auth/register/customer` | POST | Register new customer | Public |
+| `/api/auth/register/owner` | POST | Register restaurant owner | Public |
+| `/api/auth/login/customer` | POST | Customer login | Public |
+| `/api/auth/login/owner` | POST | Owner login | Public |
+| `/api/auth/login/admin` | POST | Super Admin login | Public |
+| `/api/auth/customers/me` | GET | Customer profile | JWT (customer) |
+| `/api/auth/owners/me` | GET | Owner profile | JWT (owner) |
+| `/api/users/customers` | GET | List customers | JWT (admin) |
+| `/api/users/owners` | GET | List owners | JWT (admin) |
+
+### Product Service (Port 3003)
+| Endpoint | Method | Description | Auth |
+| --- | --- | --- | --- |
+| `/api/restaurants` | GET | List restaurants | Public |
+| `/api/restaurants/:id` | GET | Restaurant detail | Public |
+| `/api/restaurants` | POST | Create restaurant (owner/admin) | JWT (owner/admin) |
+| `/api/restaurants/:id` | PUT | Update restaurant | JWT (owner/admin) |
+| `/api/restaurants/:id/status` | PATCH | Toggle active/blocked | JWT (admin) |
+| `/api/dishes` | GET | List dishes (by restaurant, filters) | Public |
+| `/api/dishes/:id` | GET | Dish detail | Public |
+| `/api/dishes` | POST | Create dish | JWT (owner/admin) |
+| `/api/dishes/:id` | PUT | Update dish | JWT (owner/admin) |
+| `/api/dishes/:id` | DELETE | Remove dish | JWT (owner/admin) |
+
+### Order Service (Port 3002)
+| Endpoint | Method | Description | Auth |
+| --- | --- | --- | --- |
+| `/api/orders` | POST | Create order with items | JWT (customer) |
+| `/api/orders` | GET | List orders (by user or admin) | JWT |
+| `/api/orders/:id` | GET | Order detail | JWT |
+| `/api/orders/:id/status` | PATCH | Update order status | JWT (owner/admin) |
+
+### Payment Service (Port 3004)
+| Endpoint | Method | Description | Auth |
+| --- | --- | --- | --- |
+| `/api/payments/vnpay/create` | POST | Create VNPay transaction | JWT (customer) |
+| `/api/payments/vnpay/return` | GET | VNPay return handler | Public (VNPay callback) |
+| `/api/payments/:orderId` | GET | Get payment status by order | JWT |
 
 ---
 
-## 📄 License
-
-MIT License - Feel free to use for learning purposes
+## Frontend Setup
+```bash
+cd frontend/Users
+npm install
+npm start
+```
+Open [http://localhost:3000](http://localhost:3000) to access the SPA.
 
 ---
 
-**🎉 Happy Coding! Enjoy your FoodFast Delivery platform! 🍕🍔🍜**
+## Testing & Linting
+**Backend**
+```bash
+npm test
+npm run lint
+```
+
+**Frontend**
+```bash
+npm test
+```
+
+Run backend tests inside each service directory (e.g., `cd services/user-service && npm test`). Frontend tests run from `frontend/Users`.
+
+---
+
+## Troubleshooting
+- **CORS Issues**: Update allowed origins in each service (`cors` middleware) and ensure the frontend URL is whitelisted.
+- **MongoDB Access**: Add your IP to the MongoDB Atlas network access list or switch to a VPC peering connection for production.
+- **VNPay Callbacks**: Verify the public callback URL is reachable, ensure the hash secret matches in VNPay dashboard, and validate timezone consistency.
+
+---
+
+## Demo & Submission
+- **GitHub Repository**: _link pending_
+- **Demo Video**: _link pending_
+- **Team Members**: _names pending_
+
+---
+
+Made with ❤️ by the FoodFast Delivery engineering team.
