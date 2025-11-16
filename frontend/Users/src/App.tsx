@@ -5,10 +5,11 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { RestaurantOwnerAuthProvider } from "@/contexts/RestaurantOwnerAuthContext";
 import { AddressConfirmationDialog } from "@/components/AddressConfirmationDialog";
+import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import RestaurantDetail from "@/pages/RestaurantDetail";
@@ -20,6 +21,7 @@ import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
 import RestaurantOwnerLogin from "@/pages/RestaurantOwnerLogin";
 import RestaurantOwnerDashboard from "@/pages/RestaurantOwnerDashboard";
+import ApiTestPage from "@/pages/ApiTestPage";
 
 function Router() {
   return (
@@ -29,11 +31,13 @@ function Router() {
       <Route path="/cart" component={Cart} />
       <Route path="/checkout" component={Checkout} />
       <Route path="/login" component={Login} />
+      <Route path="/login-customer" component={Login} />
       <Route path="/profile" component={Profile} />
       <Route path="/admin/login" component={AdminLogin} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/owner/login" component={RestaurantOwnerLogin} />
       <Route path="/owner" component={RestaurantOwnerDashboard} />
+      <Route path="/test-api" component={ApiTestPage} />
       <Route component={NotFound} />
     </Switch>
   );

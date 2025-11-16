@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect } from "react";
-import { login as apiLogin, getMe, logout as apiLogout, getToken } from "@/services/auth";
+import { createContext, useState, useEffect, type ReactNode } from "react";
+import { loginCustomer, registerCustomer, getCustomerMe } from "@/api/auth";
+import { clearToken, getToken, setToken } from "@/api/client";
 
 interface User {
   id: string;
@@ -18,9 +19,9 @@ interface AuthContextType {
   updateProfile: (updates: Partial<User>) => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     const stored = localStorage.getItem("user");
     return stored ? JSON.parse(stored) : null;
@@ -34,37 +35,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  const login = async (email: string, password: string) => {
-    const backendUser = await apiLogin({ email, password });
-    const mapped: User = {
-      id: backendUser?.id || backendUser?._id || "",
-      name: backendUser?.fullName || backendUser?.username || "",
-      email: backendUser?.email || email,
-      phone: backendUser?.phone,
-      address:
-        backendUser?.customerProfile?.address?.street ||
-        backendUser?.customerProfile?.address ||
+  const mapBackendUser = (payload?: any): User => {
+    if (!payload) {
+      return {
+        id: "",
+        name: "",
+        email: "",
+      };
+    }
+    const baseUser = payload?.user || payload;
+    const profile = payload?.customer || payload?.owner || baseUser;
+    const derivedName =
+      profile?.full_name ||
+      baseUser?.full_name ||
+      baseUser?.fullName ||
+      baseUser?.username ||
+      profile?.display_name ||
+      baseUser?.email?.split("@")[0] ||
+      "";
+    return {
+      id:
+        baseUser?._id ||
+        baseUser?.id ||
+        profile?._id ||
+        profile?.id ||
+        baseUser?.email ||
         "",
+      name: derivedName,
+      email: baseUser?.email || profile?.email || "",
+      phone: profile?.phone,
+      address: profile?.address || profile?.customerProfile?.address || "",
     };
+  };
+
+  const login = async (email: string, password: string) => {
+    const response = await loginCustomer({ email, password });
+    const payload = response.data;
+    if (payload?.token) {
+      setToken(payload.token);
+    }
+    const mapped = mapBackendUser(payload?.customer || payload?.user || payload?.data);
     setUser(mapped);
   };
 
   const register = async (name: string, email: string, password: string) => {
-    console.log("Register:", { name, email, password });
-    
-    const mockUser: User = {
-      id: "1",
-      name: name,
-      email: email,
-      phone: "",
-      address: "",
-    };
-    
-    setUser(mockUser);
+    const username = email.split("@")[0];
+    const response = await registerCustomer({
+      email,
+      password,
+      username,
+      full_name: name,
+      phone: "0000000000",
+      address: "N/A",
+    });
+    const payload = response.data;
+    if (payload?.token) {
+      setToken(payload.token);
+    }
+    const mapped = mapBackendUser(payload?.customer || payload?.user || payload?.data);
+    setUser(mapped);
   };
 
   const logout = () => {
-    apiLogout();
+    clearToken();
     setUser(null);
   };
 
@@ -80,18 +113,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const maybeHydrate = async () => {
       try {
         if (!user && getToken()) {
-          const me = await getMe();
-          const mapped: User = {
-            id: me?.id || me?._id || "",
-            name: me?.fullName || me?.username || "",
-            email: me?.email || "",
-            phone: me?.phone,
-            address:
-              me?.customerProfile?.address?.street ||
-              me?.customerProfile?.address ||
-              "",
-          };
-          setUser(mapped);
+          const response = await getCustomerMe();
+          const profile = response?.data?.customer || response?.data?.user || response?.data;
+          if (profile) {
+            const mapped: User = {
+              id: profile?.user?._id || profile?._id || "",
+              name:
+                profile?.user?.full_name ||
+                profile?.full_name ||
+                profile?.user?.username ||
+                profile?.username ||
+                "",
+              email: profile?.user?.email || profile?.email || "",
+              phone: profile?.phone,
+              address: profile?.address || "",
+            };
+            setUser(mapped);
+          }
         }
       } catch {
         // ignore and keep user null
@@ -115,12 +153,4 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within AuthProvider");
-  }
-  return context;
 }
