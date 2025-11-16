@@ -271,25 +271,18 @@ export const loginAdmin = async (req, res, next) => {
 
     const { email, password } = req.body;
 
-    const admin = await Admin.findOne({ email }).select('+password');
-    if (!admin) return res.status(401).json({ message: 'Invalid credentials' });
+    const user = await User.findOne({ email, role: 'admin' }).select('+password');
+    if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
-    const match = await admin.comparePassword(password);
+    const match = await user.comparePassword(password);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
 
-    await Admin.findByIdAndUpdate(admin._id, { lastLogin: new Date() });
-
-    const token = generateToken({ id: admin._id, role: 'admin' });
+    const token = generateToken(user);
 
     res.status(200).json({
       success: true,
-      message: 'Login successful',
-      admin: {
-        _id: admin._id,
-        email: admin.email,
-        username: admin.username,
-        role: 'admin'
-      },
+      message: 'Admin login successful',
+      user: sanitizeUser(user),
       token
     });
   } catch (error) {

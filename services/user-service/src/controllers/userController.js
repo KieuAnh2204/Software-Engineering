@@ -76,3 +76,43 @@ export const getAllRestaurantOwners = async (req, res) => {
     });
   }
 };
+
+export const updateRestaurantOwnerStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!['APPROVED', 'REJECTED', 'SUSPENDED'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status. Allowed: APPROVED, REJECTED, SUSPENDED'
+      });
+    }
+
+    const owner = await RestaurantOwner.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true, runValidators: true }
+    ).populate('user', '-password');
+
+    if (!owner) {
+      return res.status(404).json({
+        success: false,
+        message: 'Restaurant owner not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Restaurant owner status updated to ${status}`,
+      data: owner
+    });
+  } catch (error) {
+    console.error('Error updating owner status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating owner status',
+      error: error.message
+    });
+  }
+};
