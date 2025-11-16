@@ -3,8 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './config/database.js';
 import authRoutes from './routes/authRoutes.js';
-import brandRoutes from './routes/brandRoutes.js';
-import restaurantRoutes from './routes/restaurantRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 dotenv.config();
@@ -34,9 +33,7 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
-// Brand & Restaurant Management (restaurant endpoints now live under /api/auth)
-app.use('/api/brands', brandRoutes);
-app.use('/api/restaurants', restaurantRoutes);
+app.use('/api/users', userRoutes);
 
 // Error handling
 app.use(errorHandler);

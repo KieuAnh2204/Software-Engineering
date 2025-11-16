@@ -1,21 +1,19 @@
 import express from 'express';
 import { body } from 'express-validator';
-import { 
+import {
+  register,
   registerCustomer,
-  registerRestaurant,
+  registerRestaurantOwner,
   loginCustomer,
-  loginRestaurant,
+  loginRestaurantOwner,
+  loginAdmin,
   getCustomerMe,
-  getBrandMe,
-  getMyRestaurants,
+  getOwnerMe
 } from '../controllers/authController.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// ==================== VALIDATION RULES ====================
-
-// Validation cho đăng ký Customer
 const customerRegisterValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Invalid email'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
@@ -25,47 +23,56 @@ const customerRegisterValidation = [
   body('address').notEmpty().withMessage('Address is required')
 ];
 
-// Validation cho đăng ký Restaurant Owner (Brand Manager)
-const restaurantOwnerRegisterValidation = [
+const ownerRegisterValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Invalid email'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('username').isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
-  body('name').notEmpty().withMessage('Brand name is required'),
+  body('name').notEmpty().withMessage('Owner display name is required'),
   body('logo_url').optional().isURL().withMessage('Logo URL must be valid')
 ];
 
-// Validation cho login
+const genericRegisterValidation = [
+  body('role').notEmpty().withMessage('Role is required'),
+  body('role').isIn(['customer', 'owner']).withMessage('Invalid role. Allowed roles: customer, owner'),
+  body('email').isEmail().normalizeEmail().withMessage('Invalid email'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('username').isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
+  body('full_name')
+    .if((value, { req }) => req.body.role === 'customer')
+    .notEmpty()
+    .withMessage('Full name is required for customers'),
+  body('phone')
+    .if((value, { req }) => req.body.role === 'customer')
+    .notEmpty()
+    .withMessage('Phone number is required for customers'),
+  body('address')
+    .if((value, { req }) => req.body.role === 'customer')
+    .notEmpty()
+    .withMessage('Address is required for customers'),
+  body('name')
+    .if((value, { req }) => req.body.role === 'owner')
+    .notEmpty()
+    .withMessage('Owner display name is required for owners'),
+  body('logo_url')
+    .optional()
+    .isURL()
+    .withMessage('Logo URL must be valid when provided')
+];
+
 const loginValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Invalid email'),
   body('password').notEmpty().withMessage('Password is required')
 ];
 
-// Validation cho tạo Restaurant
-const createRestaurantValidation = [
-  body('name').notEmpty().withMessage('Restaurant name is required'),
-  body('address').notEmpty().withMessage('Address is required'),
-  body('phone').notEmpty().withMessage('Phone number is required')
-];
-
-// ==================== ROUTES ====================
-
-// Đăng ký Customer
+router.post('/register', genericRegisterValidation, register);
 router.post('/register/customer', customerRegisterValidation, registerCustomer);
+router.post('/register/owner', ownerRegisterValidation, registerRestaurantOwner);
 
-// Đăng ký Restaurant Brand (Brand Manager)
-router.post('/register/restaurant', restaurantOwnerRegisterValidation, registerRestaurant);
-
-// Login tách biệt
 router.post('/login/customer', loginValidation, loginCustomer);
-router.post('/login/restaurant', loginValidation, loginRestaurant);
+router.post('/login/owner', loginValidation, loginRestaurantOwner);
+router.post('/login/admin', loginValidation, loginAdmin);
 
-// Profile endpoints
 router.get('/customers/me', authenticate, getCustomerMe);
-router.get('/brands/me', authenticate, getBrandMe);
-
-// Restaurant management (RESTAURANT_OWNER only)
-router.get('/restaurants/my', authenticate, getMyRestaurants);
-
-// Admin route moved to restaurantsRoutes
+router.get('/owners/me', authenticate, getOwnerMe);
 
 export default router;

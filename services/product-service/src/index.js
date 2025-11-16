@@ -3,11 +3,8 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
 const connectDB = require('./config/database');
-// Reverting back to legacy product routes; removing Category & Dish domain
-const productRoutes = require('./routes/productRoutes');
-// Category & Dish domain disabled
-// const categoryRoutes = require('./routes/categoryRoutes');
-// const dishRoutes = require('./routes/dishRoutes');
+const restaurantRoutes = require('./routes/restaurantRoutes');
+const dishRoutes = require('./routes/dishRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 // For debugging why process exits early, log basic startup info
@@ -34,9 +31,8 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/products', productRoutes);
-
-// Category & Dish routes removed
+app.use('/api/restaurants', restaurantRoutes);
+app.use('/api/dishes', dishRoutes);
 
 // Error handling
 app.use(errorHandler);
