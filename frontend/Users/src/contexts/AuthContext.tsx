@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect, type ReactNode } from "react";
-import { loginCustomer, registerCustomer, getCustomerMe } from "@/api/auth";
+import { loginCustomer, registerCustomer, getCustomerMe, updateCustomerProfile } from "@/api/auth";
 import { clearToken, getToken, setToken } from "@/api/client";
 
 interface User {
@@ -14,9 +14,9 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (username: string, fullName: string, email: string, password: string, phone?: string, address?: string) => Promise<void>;
   logout: () => void;
-  updateProfile: (updates: Partial<User>) => void;
+  updateProfile: (updates: Partial<User>) => Promise<User>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -43,68 +43,85 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: "",
       };
     }
-    const baseUser = payload?.user || payload;
-    const profile = payload?.customer || payload?.owner || baseUser;
-    const derivedName =
-      profile?.full_name ||
-      baseUser?.full_name ||
-      baseUser?.fullName ||
-      baseUser?.username ||
-      profile?.display_name ||
-      baseUser?.email?.split("@")[0] ||
-      "";
+    
+    // Backend giờ trả về user object đã merge với profile
+    const userObj = payload?.user || payload;
+    
     return {
-      id:
-        baseUser?._id ||
-        baseUser?.id ||
-        profile?._id ||
-        profile?.id ||
-        baseUser?.email ||
-        "",
-      name: derivedName,
-      email: baseUser?.email || profile?.email || "",
-      phone: profile?.phone,
-      address: profile?.address || profile?.customerProfile?.address || "",
+      id: userObj?._id || userObj?.id || "",
+      name: userObj?.full_name || userObj?.username || userObj?.email?.split("@")[0] || "",
+      email: userObj?.email || "",
+      phone: userObj?.phone || undefined,
+      address: userObj?.address || undefined,
     };
   };
 
   const login = async (email: string, password: string) => {
     const response = await loginCustomer({ email, password });
     const payload = response.data;
+    
+    // Lưu token vào localStorage
     if (payload?.token) {
       setToken(payload.token);
+      localStorage.setItem("token", payload.token);
     }
-    const mapped = mapBackendUser(payload?.customer || payload?.user || payload?.data);
+    
+    // Map và lưu user
+    const mapped = mapBackendUser(payload);
     setUser(mapped);
+    localStorage.setItem("user", JSON.stringify(mapped));
   };
 
-  const register = async (name: string, email: string, password: string) => {
-    const username = email.split("@")[0];
+  const register = async (username: string, fullName: string, email: string, password: string, phone?: string, address?: string) => {
     const response = await registerCustomer({
       email,
       password,
-      username,
-      full_name: name,
-      phone: "0000000000",
-      address: "N/A",
+      username: username || email.split("@")[0],
+      full_name: fullName,
+      phone: phone || "",
+      address: address || "",
     });
     const payload = response.data;
+    
+    // Lưu token vào localStorage
     if (payload?.token) {
       setToken(payload.token);
+      localStorage.setItem("token", payload.token);
     }
-    const mapped = mapBackendUser(payload?.customer || payload?.user || payload?.data);
+    
+    // Map và lưu user
+    const mapped = mapBackendUser(payload);
     setUser(mapped);
+    localStorage.setItem("user", JSON.stringify(mapped));
   };
 
   const logout = () => {
     clearToken();
     setUser(null);
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
   };
 
-  const updateProfile = (updates: Partial<User>) => {
-    if (user) {
-      const updatedUser = { ...user, ...updates };
-      setUser(updatedUser);
+  const updateProfile = async (updates: Partial<User>) => {
+    try {
+      // Gọi API backend để update
+      const response = await updateCustomerProfile({
+        full_name: updates.name,
+        phone: updates.phone,
+        address: updates.address,
+      });
+      
+      const payload = response.data;
+      
+      // Map lại user từ response
+      const mapped = mapBackendUser(payload);
+      setUser(mapped);
+      localStorage.setItem("user", JSON.stringify(mapped));
+      
+      return mapped;
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+      throw error;
     }
   };
 

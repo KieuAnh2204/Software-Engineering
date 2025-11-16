@@ -142,12 +142,29 @@ const createOwnerAccount = async ({ email, password, username, name, logo_url, p
 
 const respondWithAuthPayload = (res, user, profileKey, profileValue, message, status = 201) => {
   const token = generateToken(user);
+  
+  // Merge user và profile thành một object
+  const userObj = sanitizeUser(user);
+  const profileObj = profileValue.toObject ? profileValue.toObject() : profileValue;
+  
+  // Tạo response user object với đầy đủ thông tin
+  const responseUser = {
+    _id: userObj._id,
+    email: userObj.email,
+    username: userObj.username,
+    full_name: profileObj.full_name || profileObj.display_name || userObj.username,
+    phone: profileObj.phone || null,
+    address: profileObj.address || null,
+    role: userObj.role,
+    created_at: userObj.createdAt,
+    updated_at: userObj.updatedAt
+  };
+  
   res.status(status).json({
     success: true,
     message,
-    token,
-    user: sanitizeUser(user),
-    [profileKey]: profileValue
+    user: responseUser,
+    token
   });
 };
 

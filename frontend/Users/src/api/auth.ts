@@ -18,3 +18,6 @@ export const loginAdmin = (data: Record<string, unknown>) =>
 export const getCustomerMe = () => userClient.get("/customers/me");
 
 export const getOwnerMe = () => userClient.get("/owners/me");
+
+export const updateCustomerProfile = (data: { full_name?: string; phone?: string; address?: string }) =>
+  userClient.patch("/profile", data);

@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { RestaurantOwnerAuthProvider } from "@/contexts/RestaurantOwnerAuthContext";
+import { OwnerAuthProvider } from "@/contexts/OwnerAuthContext";
 import { AddressConfirmationDialog } from "@/components/AddressConfirmationDialog";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
@@ -21,6 +22,11 @@ import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
 import RestaurantOwnerLogin from "@/pages/RestaurantOwnerLogin";
 import RestaurantOwnerDashboard from "@/pages/RestaurantOwnerDashboard";
+import OwnerLogin from "@/pages/OwnerLogin";
+import OwnerRegister from "@/pages/OwnerRegister";
+import OwnerHome from "@/pages/OwnerHome";
+import RestaurantRegister from "@/pages/RestaurantRegister";
+import OwnerDashboard from "@/pages/OwnerDashboard";
 import ApiTestPage from "@/pages/ApiTestPage";
 
 function Router() {
@@ -37,6 +43,11 @@ function Router() {
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/owner/login" component={RestaurantOwnerLogin} />
       <Route path="/owner" component={RestaurantOwnerDashboard} />
+      <Route path="/owner/register" component={OwnerRegister} />
+      <Route path="/owner/auth/login" component={OwnerLogin} />
+      <Route path="/owner/home" component={OwnerHome} />
+      <Route path="/owner/restaurant/new" component={RestaurantRegister} />
+      <Route path="/owner/dashboard" component={OwnerDashboard} />
       <Route path="/test-api" component={ApiTestPage} />
       <Route component={NotFound} />
     </Switch>
@@ -86,10 +97,12 @@ function App() {
         <AuthProvider>
           <AdminAuthProvider>
             <RestaurantOwnerAuthProvider>
-              <TooltipProvider>
-                <Toaster />
-                <AppContent />
-              </TooltipProvider>
+              <OwnerAuthProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <AppContent />
+                </TooltipProvider>
+              </OwnerAuthProvider>
             </RestaurantOwnerAuthProvider>
           </AdminAuthProvider>
         </AuthProvider>

@@ -22,20 +22,36 @@ export function LoginDialog({ open, onOpenChange, onLoginSuccess }: LoginDialogP
   const { login, register } = useAuth();
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [signupUsername, setSignupUsername] = useState("");
   const [signupName, setSignupName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
+  const [signupPhone, setSignupPhone] = useState("");
+  const [signupAddress, setSignupAddress] = useState("");
+  const [error, setError] = useState("");
+
+  console.log("LoginDialog rendered with 6 fields - v2");
 
   const handleLogin = async () => {
-    await login(loginEmail, loginPassword);
-    onOpenChange?.(false);
-    onLoginSuccess?.();
+    try {
+      setError("");
+      await login(loginEmail, loginPassword);
+      onOpenChange?.(false);
+      onLoginSuccess?.();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Login failed");
+    }
   };
 
   const handleSignup = async () => {
-    await register(signupName, signupEmail, signupPassword);
-    onOpenChange?.(false);
-    onLoginSuccess?.();
+    try {
+      setError("");
+      await register(signupUsername, signupName, signupEmail, signupPassword, signupPhone, signupAddress);
+      onOpenChange?.(false);
+      onLoginSuccess?.();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Registration failed");
+    }
   };
 
   return (
@@ -55,6 +71,11 @@ export function LoginDialog({ open, onOpenChange, onLoginSuccess }: LoginDialogP
           </TabsList>
 
           <TabsContent value="login" className="space-y-4 mt-4">
+            {error && (
+              <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">
+                {error}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="login-email">Email</Label>
               <Input
@@ -87,6 +108,11 @@ export function LoginDialog({ open, onOpenChange, onLoginSuccess }: LoginDialogP
           </TabsContent>
 
           <TabsContent value="signup" className="space-y-4 mt-4">
+            {error && (
+              <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">
+                {error}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="signup-name">Full Name</Label>
               <Input
@@ -96,6 +122,28 @@ export function LoginDialog({ open, onOpenChange, onLoginSuccess }: LoginDialogP
                 value={signupName}
                 onChange={(e) => setSignupName(e.target.value)}
                 data-testid="input-signup-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="signup-username">Username</Label>
+              <Input
+                id="signup-username"
+                type="text"
+                placeholder="johndoe"
+                value={signupUsername}
+                onChange={(e) => setSignupUsername(e.target.value)}
+                data-testid="input-signup-username"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="signup-phone">Phone</Label>
+              <Input
+                id="signup-phone"
+                type="tel"
+                placeholder="0909123456"
+                value={signupPhone}
+                onChange={(e) => setSignupPhone(e.target.value)}
+                data-testid="input-signup-phone"
               />
             </div>
             <div className="space-y-2">
@@ -118,6 +166,17 @@ export function LoginDialog({ open, onOpenChange, onLoginSuccess }: LoginDialogP
                 value={signupPassword}
                 onChange={(e) => setSignupPassword(e.target.value)}
                 data-testid="input-signup-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="signup-address">Address (optional)</Label>
+              <Input
+                id="signup-address"
+                type="text"
+                placeholder="123 Street Name"
+                value={signupAddress}
+                onChange={(e) => setSignupAddress(e.target.value)}
+                data-testid="input-signup-address"
               />
             </div>
             <Button

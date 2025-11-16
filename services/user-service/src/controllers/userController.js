@@ -1,5 +1,6 @@
 import Customer from '../models/Customer.js';
 import RestaurantOwner from '../models/RestaurantOwner.js';
+import User from '../models/User.js';
 
 export const getAllCustomers = async (req, res) => {
   try {
@@ -112,6 +113,59 @@ export const updateRestaurantOwnerStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error updating owner status',
+      error: error.message
+    });
+  }
+};
+
+// Update customer profile
+export const updateCustomerProfile = async (req, res) => {
+  try {
+    const userId = req.user.id; // From auth middleware
+    const { full_name, phone, address } = req.body;
+
+    // Find customer by user ID
+    const customer = await Customer.findOne({ user: userId });
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Customer profile not found'
+      });
+    }
+
+    // Update customer fields
+    if (full_name !== undefined) customer.full_name = full_name;
+    if (phone !== undefined) customer.phone = phone;
+    if (address !== undefined) customer.address = address;
+
+    await customer.save();
+
+    // Get updated user info
+    const user = await User.findById(userId).select('-password');
+
+    // Return merged response
+    const responseUser = {
+      _id: user._id,
+      email: user.email,
+      username: user.username,
+      full_name: customer.full_name,
+      phone: customer.phone,
+      address: customer.address,
+      role: user.role,
+      created_at: user.createdAt,
+      updated_at: user.updatedAt
+    };
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: responseUser
+    });
+  } catch (error) {
+    console.error('Error updating customer profile:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating profile',
       error: error.message
     });
   }
