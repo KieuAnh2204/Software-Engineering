@@ -54,9 +54,16 @@ const ensureOwnerProfile = async ({ userId, profile = {} }) => {
     Check Email / Username Duplication
    ====================================================== */
 const handleUniqueCredentialCheck = async (email, username) => {
-  const existing = await User.findOne({ $or: [{ email }, { username }] });
-  if (existing) {
-    const error = new Error('Email or username already exists');
+  const emailExists = await User.findOne({ email });
+  if (emailExists) {
+    const error = new Error('email already exists');
+    error.statusCode = 400;
+    throw error;
+  }
+  
+  const usernameExists = await User.findOne({ username });
+  if (usernameExists) {
+    const error = new Error('username already exists');
     error.statusCode = 400;
     throw error;
   }
@@ -68,6 +75,7 @@ const handleUniqueCredentialCheck = async (email, username) => {
 const createCustomerAccount = async ({ email, password, username, full_name, phone, address }) => {
   await handleUniqueCredentialCheck(email, username);
 
+  // Tạo user trước
   const user = await User.create({
     email,
     password,
@@ -75,12 +83,25 @@ const createCustomerAccount = async ({ email, password, username, full_name, pho
     role: 'customer'
   });
 
-  const customer = await ensureCustomerProfile({
-    userId: user._id,
-    profile: { full_name, phone, address }
-  });
+  // Tạo customer profile, nếu lỗi thì xóa user
+  try {
+    const customer = await Customer.create({
+      user: user._id,
+      full_name,
+      phone,
+      address: address || ''
+    });
 
-  return { user, customer };
+    return { user, customer };
+  } catch (err) {
+    // Cleanup user nếu tạo customer thất bại
+    try {
+      await User.findByIdAndDelete(user._id);
+    } catch (cleanupErr) {
+      console.error('Failed to cleanup user after customer creation error', cleanupErr);
+    }
+    throw err;
+  }
 };
 
 /* ======================================================
@@ -89,6 +110,7 @@ const createCustomerAccount = async ({ email, password, username, full_name, pho
 const createOwnerAccount = async ({ email, password, username, name, logo_url, phone, address }) => {
   await handleUniqueCredentialCheck(email, username);
 
+  // Tạo user trước
   const user = await User.create({
     email,
     password,
@@ -96,22 +118,53 @@ const createOwnerAccount = async ({ email, password, username, name, logo_url, p
     role: 'owner'
   });
 
-  const owner = await ensureOwnerProfile({
-    userId: user._id,
-    profile: { name, logo_url, phone, address }
-  });
+  // Tạo owner profile, nếu lỗi thì xóa user
+  try {
+    const owner = await RestaurantOwner.create({
+      user: user._id,
+      display_name: name || username,
+      logo_url: logo_url || null,
+      phone: phone || '',
+      address: address || ''
+    });
 
-  return { user, owner };
+    return { user, owner };
+  } catch (err) {
+    // Cleanup user nếu tạo owner thất bại
+    try {
+      await User.findByIdAndDelete(user._id);
+    } catch (cleanupErr) {
+      console.error('Failed to cleanup user after owner creation error', cleanupErr);
+    }
+    throw err;
+  }
 };
 
 const respondWithAuthPayload = (res, user, profileKey, profileValue, message, status = 201) => {
   const token = generateToken(user);
+  
+  // Merge user và profile thành một object
+  const userObj = sanitizeUser(user);
+  const profileObj = profileValue.toObject ? profileValue.toObject() : profileValue;
+  
+  // Tạo response user object với đầy đủ thông tin
+  const responseUser = {
+    _id: userObj._id,
+    email: userObj.email,
+    username: userObj.username,
+    full_name: profileObj.full_name || profileObj.display_name || userObj.username,
+    phone: profileObj.phone || null,
+    address: profileObj.address || null,
+    role: userObj.role,
+    created_at: userObj.createdAt,
+    updated_at: userObj.updatedAt
+  };
+  
   res.status(status).json({
     success: true,
     message,
-    token,
-    user: sanitizeUser(user),
-    [profileKey]: profileValue
+    user: responseUser,
+    token
   });
 };
 
@@ -124,71 +177,13 @@ export const registerCustomer = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { email, password, username, full_name, phone, address } = req.body;
-    await handleUniqueCredentialCheck(email, username);
+    const { user, customer } = await createCustomerAccount(req.body);
 
-    // Try to use a MongoDB transaction (requires replica set / Atlas)
-    let session;
-    try {
-      session = await mongoose.startSession();
-    } catch (err) {
-      session = null;
-    }
-
-    if (session) {
-      let userDoc, customerDoc;
-      try {
-        session.startTransaction();
-
-        const createdUsers = await User.create([
-          { email, password, username, role: 'customer' }
-        ], { session });
-        userDoc = createdUsers[0];
-
-        const createdCustomers = await Customer.create([
-          { user: userDoc._id, full_name, phone, address: address || '' }
-        ], { session });
-        customerDoc = createdCustomers[0];
-
-        await session.commitTransaction();
-        session.endSession();
-
-        respondWithAuthPayload(res, userDoc, 'customer', customerDoc, 'Customer registered successfully');
-        return;
-      } catch (err) {
-        await session.abortTransaction();
-        session.endSession();
-        // rethrow to outer handler
-        throw err;
-      }
-    }
-
-    // Fallback (no transaction support) - create user then customer and cleanup on failure
-    const user = await User.create({ email, password, username, role: 'customer' });
-    try {
-      const customer = await Customer.create({
-        user: user._id,
-        full_name,
-        phone,
-        address: address || ''
-      });
-      respondWithAuthPayload(res, user, 'customer', customer, 'Customer registered successfully');
-      return;
-    } catch (err) {
-      // attempt cleanup of orphaned user
-      try {
-        await User.findByIdAndDelete(user._id);
-      } catch (cleanupErr) {
-        // log cleanup failure but continue to propagate original error
-        console.error('Failed to cleanup user after customer creation error', cleanupErr);
-      }
-      throw err;
-    }
+    respondWithAuthPayload(res, user, 'customer', customer, 'Customer registered successfully');
   } catch (error) {
     next(error);
   }
 };
-
 
 /* ======================================================
     REGISTER OWNER
@@ -278,6 +273,93 @@ export const loginRestaurantOwner = async (req, res, next) => {
     const owner = await ensureOwnerProfile({ userId: user._id });
 
     respondWithAuthPayload(res, user, 'owner', owner, 'Login successful', 200);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/* ======================================================
+    LOGIN ADMIN
+   ====================================================== */
+export const loginAdmin = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email, role: 'admin' }).select('+password');
+    if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+
+    const match = await user.comparePassword(password);
+    if (!match) return res.status(401).json({ message: 'Invalid credentials' });
+
+    const token = generateToken(user);
+
+    res.status(200).json({
+      success: true,
+      message: 'Admin login successful',
+      user: sanitizeUser(user),
+      token
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/* ======================================================
+    GET CUSTOMER PROFILE (Protected Route)
+   ====================================================== */
+export const getCustomerMe = async (req, res, next) => {
+  try {
+    const userId = req.user.id; // From JWT middleware
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const customer = await Customer.findOne({ user: userId });
+    if (!customer) {
+      return res.status(404).json({ message: 'Customer profile not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user: sanitizeUser(user),
+        customer
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/* ======================================================
+    GET OWNER PROFILE (Protected Route)
+   ====================================================== */
+export const getOwnerMe = async (req, res, next) => {
+  try {
+    const userId = req.user.id; // From JWT middleware
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const owner = await RestaurantOwner.findOne({ user: userId });
+    if (!owner) {
+      return res.status(404).json({ message: 'Owner profile not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user: sanitizeUser(user),
+        owner
+      }
+    });
   } catch (error) {
     next(error);
   }

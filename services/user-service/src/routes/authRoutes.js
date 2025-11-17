@@ -10,6 +10,7 @@ import {
   getCustomerMe,
   getOwnerMe
 } from '../controllers/authController.js';
+import { updateCustomerProfile } from '../controllers/userController.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -74,5 +75,12 @@ router.post('/login/admin', loginValidation, loginAdmin);
 
 router.get('/customers/me', authenticate, getCustomerMe);
 router.get('/owners/me', authenticate, getOwnerMe);
+
+// Update customer profile
+router.patch('/profile', authenticate, [
+  body('full_name').optional().notEmpty().withMessage('Full name cannot be empty'),
+  body('phone').optional().notEmpty().withMessage('Phone cannot be empty'),
+  body('address').optional().notEmpty().withMessage('Address cannot be empty')
+], updateCustomerProfile);
 
 export default router;

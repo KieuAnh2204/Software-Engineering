@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link, useLocation } from "wouter";
 import { OrderStatusStepper } from "@/components/OrderStatusStepper";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Profile() {
@@ -63,13 +63,21 @@ export default function Profile() {
     },
   ];
 
-  const handleSave = () => {
-    updateProfile({ name, email, phone, address });
-    toast({
-      title: "Profile updated",
-      description: "Your changes have been saved successfully.",
-    });
-    setIsEditing(false);
+  const handleSave = async () => {
+    try {
+      await updateProfile({ name, email, phone, address });
+      toast({
+        title: "Profile updated",
+        description: "Your changes have been saved successfully to MongoDB Atlas.",
+      });
+      setIsEditing(false);
+    } catch (error: any) {
+      toast({
+        title: "Update failed",
+        description: error?.response?.data?.message || "Failed to update profile",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleUploadAvatar = () => {
