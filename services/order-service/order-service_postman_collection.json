@@ -1,170 +1,261 @@
 {
   "info": {
-    "name": "Order Service API",
+    "name": "Order Service - Cart & Orders",
     "_postman_id": "8b3d7b56-87f5-4f0e-9a45-66b2a4a6f1c9",
-    "description": "Postman collection for Order Service endpoints.",
+    "description": "Postman collection to test the cart → checkout → orders flow for the order-service.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "base_url", "value": "http://localhost:3002" },
     { "key": "customer_token", "value": "" },
-    { "key": "restaurant_token", "value": "" },
-    { "key": "admin_token", "value": "" }
+    { "key": "restaurant_id", "value": "" },
+    { "key": "product_id", "value": "" },
+    { "key": "item_id", "value": "" },
+    { "key": "order_id", "value": "" },
+    {
+      "key": "order_statuses",
+      "value": "completed,cancelled,delivering,preparing,confirmed,payment_failed"
+    }
   ],
   "item": [
     {
-      "name": "POST /api/orders - Create Order (customer)",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json", "type": "text" },
-          { "key": "Authorization", "value": "Bearer {{customer_token}}", "type": "text" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"customer_id\": \"C123\",\n  \"restaurant_id\": \"R456\",\n  \"items\": [\n    { \"dish_id\": \"D1\", \"quantity\": 2 },\n    { \"dish_id\": \"D2\", \"quantity\": 1 }\n  ],\n  \"note\": \"no chili please\"\n}"
+      "name": "Cart",
+      "item": [
+        {
+          "name": "GET /api/orders/cart - Get/Create Cart",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders/cart?restaurant_id={{restaurant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "cart"],
+              "query": [
+                { "key": "restaurant_id", "value": "{{restaurant_id}}" }
+              ]
+            },
+            "description": "Gets the current cart for the authenticated customer and given restaurant_id. Creates a new empty cart if none exists."
+          },
+          "response": []
         },
-        "url": {
-          "raw": "{{base_url}}/api/orders",
-          "host": ["{{base_url}}"],
-          "path": ["api", "orders"]
+        {
+          "name": "POST /api/orders/cart/items - Add Item to Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurant_id\": \"{{restaurant_id}}\",\n  \"productId\": \"{{product_id}}\",\n  \"quantity\": 2,\n  \"notes\": \"no onion\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/cart/items",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "cart", "items"]
+            },
+            "description": "Adds an item (dish/product) into the customer's cart for a specific restaurant."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /api/orders/cart/items/:itemId - Update Cart Item",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurant_id\": \"{{restaurant_id}}\",\n  \"quantity\": 3\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/cart/items/{{item_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "cart", "items", "{{item_id}}"]
+            },
+            "description": "Updates quantity and/or notes of a cart item. Set quantity <= 0 to remove it."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/orders/cart/items/:itemId - Remove Cart Item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurant_id\": \"{{restaurant_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/cart/items/{{item_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "cart", "items", "{{item_id}}"]
+            },
+            "description": "Removes an item from the cart for the given restaurant_id."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/orders/cart - Clear Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurant_id\": \"{{restaurant_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/cart",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "cart"]
+            },
+            "description": "Marks the current cart as expired for the given restaurant and clears it."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/orders/cart/checkout - Checkout Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurant_id\": \"{{restaurant_id}}\",\n  \"payment_method\": \"cod\",\n  \"long_address\": \"212 Nguyen Thien Thuat, P.3, Q.3\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/cart/checkout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "cart", "checkout"]
+            },
+            "description": "Submits the current cart as an order and sets payment_method and long_address. For non-COD, the service would later integrate with PAYMENT_SERVICE_URL."
+          },
+          "response": []
         }
-      },
-      "response": []
+      ]
     },
     {
-      "name": "GET /api/orders/:id - Get Order By ID",
-      "request": {
-        "method": "GET",
-        "header": [
-          { "key": "Content-Type", "value": "application/json", "type": "text" },
-          { "key": "Authorization", "value": "Bearer {{customer_token}}", "type": "text" }
-        ],
-        "url": {
-          "raw": "{{base_url}}/api/orders/{{order_id}}",
-          "host": ["{{base_url}}"],
-          "path": ["api", "orders", "{{order_id}}"]
+      "name": "Orders",
+      "item": [
+        {
+          "name": "GET /api/orders - List Orders (history)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders?status={{order_statuses}}&page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders"],
+              "query": [
+                { "key": "status", "value": "{{order_statuses}}" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Lists the authenticated customer's orders filtered by status list (CSV). Defaults to completed,cancelled,delivering,preparing,confirmed,payment_failed."
+          },
+          "response": []
         },
-        "description": "Replace {{order_id}} with an actual order id (e.g., ord_123)."
-      },
-      "response": []
-    },
-    {
-      "name": "GET /api/orders - List Orders (filters)",
-      "request": {
-        "method": "GET",
-        "header": [
-          { "key": "Content-Type", "value": "application/json", "type": "text" },
-          { "key": "Authorization", "value": "Bearer {{customer_token}}", "type": "text" }
-        ],
-        "url": {
-          "raw": "{{base_url}}/api/orders?customer_id=C123&status=Pending&page=1&limit=20",
-          "host": ["{{base_url}}"],
-          "path": ["api", "orders"],
-          "query": [
-            { "key": "customer_id", "value": "C123" },
-            { "key": "status", "value": "Pending" },
-            { "key": "page", "value": "1" },
-            { "key": "limit", "value": "20" }
-          ]
+        {
+          "name": "GET /api/orders/:orderId - Get Order Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "{{order_id}}"]
+            },
+            "description": "Gets full details of a single order for the authenticated customer. Set {{order_id}} from a previous response."
+          },
+          "response": []
         }
-      },
-      "response": []
-    },
-    {
-      "name": "POST /api/orders/:id/pay - Create VNPay Intent",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json", "type": "text" },
-          { "key": "Authorization", "value": "Bearer {{customer_token}}", "type": "text" }
-        ],
-        "body": { "mode": "raw", "raw": "{}" },
-        "url": {
-          "raw": "{{base_url}}/api/orders/{{order_id}}/pay",
-          "host": ["{{base_url}}"],
-          "path": ["api", "orders", "{{order_id}}", "pay"]
-        },
-        "description": "Replace {{order_id}} with an actual order id (e.g., ord_123)."
-      },
-      "response": []
-    },
-    {
-      "name": "POST /api/orders/payment/webhook/vnpay - Payment Webhook (signed)",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json", "type": "text" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"orderId\": \"ord_123\",\n  \"status\": \"Success\",\n  \"amount\": 250000,\n  \"paymentId\": \"pay_abc123\",\n  \"signature\": \"replace_with_hmac_signature\"\n}"
-        },
-        "url": {
-          "raw": "{{base_url}}/api/orders/payment/webhook/vnpay",
-          "host": ["{{base_url}}"],
-          "path": ["api", "orders", "payment", "webhook", "vnpay"]
-        },
-        "description": "Webhook callback from payment service. The signature must be a valid HMAC of the payload."
-      },
-      "response": []
-    },
-    {
-      "name": "POST /api/orders/:id/restaurant-confirm - Processing → Delivering",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json", "type": "text" },
-          { "key": "Authorization", "value": "Bearer {{restaurant_token}}", "type": "text" }
-        ],
-        "body": { "mode": "raw", "raw": "{}" },
-        "url": {
-          "raw": "{{base_url}}/api/orders/{{order_id}}/restaurant-confirm",
-          "host": ["{{base_url}}"],
-          "path": ["api", "orders", "{{order_id}}", "restaurant-confirm"]
-        },
-        "description": "Replace {{order_id}} with an actual order id (e.g., ord_123)."
-      },
-      "response": []
-    },
-    {
-      "name": "POST /api/orders/:id/complete - Delivering → Completed",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json", "type": "text" },
-          { "key": "Authorization", "value": "Bearer {{restaurant_token}}", "type": "text" }
-        ],
-        "body": { "mode": "raw", "raw": "{}" },
-        "url": {
-          "raw": "{{base_url}}/api/orders/{{order_id}}/complete",
-          "host": ["{{base_url}}"],
-          "path": ["api", "orders", "{{order_id}}", "complete"]
-        },
-        "description": "Replace {{order_id}} with an actual order id (e.g., ord_123)."
-      },
-      "response": []
-    },
-    {
-      "name": "POST /api/orders/:id/cancel - Cancel Order",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json", "type": "text" },
-          { "key": "Authorization", "value": "Bearer {{customer_token}}", "type": "text" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"reason\": \"Customer requested cancellation\"\n}"
-        },
-        "url": {
-          "raw": "{{base_url}}/api/orders/{{order_id}}/cancel",
-          "host": ["{{base_url}}"],
-          "path": ["api", "orders", "{{order_id}}", "cancel"]
-        },
-        "description": "Replace {{order_id}} with an actual order id (e.g., ord_123)."
-      },
-      "response": []
+      ]
     }
   ]
 }
+
