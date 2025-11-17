@@ -1,36 +1,48 @@
 import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link, useLocation } from "wouter";
-import { useOwnerAuth } from "@/hooks/useOwnerAuth";
+import { registerOwner } from "@/api/ownerApi";
 import { useToast } from "@/hooks/use-toast";
 
 export default function OwnerRegister() {
   const [, setLocation] = useLocation();
-  const { register } = useOwnerAuth();
   const { toast } = useToast();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+  const [name, setName] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Đăng ký Owner với đầy đủ 6 trường: email, password, username, full_name, phone, address
-      await register(email, password, username, fullName, "", phone, address);
+      const response = await registerOwner({
+        email,
+        password,
+        username,
+        name,
+        ...(logoUrl && { logo_url: logoUrl }), // Only include if not empty
+      });
+      
+      // Save token and owner_id to localStorage
+      // Backend returns: { success, message, user, token }
+      const { token, user } = response.data;
+      if (token && user) {
+        localStorage.setItem("owner_token", token);
+        localStorage.setItem("owner_id", user._id);
+      }
+      
       toast({
         title: "Registration successful",
-        description: "Your owner account has been created! Status: PENDING",
+        description: "Now create your restaurant!",
       });
-      setLocation("/owner/home");
+      
+      setLocation("/owner/create-restaurant");
     } catch (error: any) {
       toast({
         title: "Registration failed",
@@ -42,8 +54,6 @@ export default function OwnerRegister() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-
       <main className="container mx-auto px-4 py-8 max-w-md">
         <div className="flex items-center gap-4 mb-6">
           <Link href="/">
@@ -104,41 +114,27 @@ export default function OwnerRegister() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="full_name">Full Name</Label>
+                <Label htmlFor="name">Full Name</Label>
                 <Input
-                  id="full_name"
+                  id="name"
                   type="text"
                   placeholder="Trần Văn Chủ"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   required
-                  data-testid="input-full-name"
+                  data-testid="input-name"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label htmlFor="logo_url">Logo URL (Optional)</Label>
                 <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="0909123456"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                  data-testid="input-phone"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Input
-                  id="address"
-                  type="text"
-                  placeholder="HCM City"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  required
-                  data-testid="input-address"
+                  id="logo_url"
+                  type="url"
+                  placeholder="https://example.com/logo.jpg"
+                  value={logoUrl}
+                  onChange={(e) => setLogoUrl(e.target.value)}
+                  data-testid="input-logo-url"
                 />
               </div>
 

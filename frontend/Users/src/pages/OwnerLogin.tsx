@@ -1,38 +1,42 @@
-import { useState, FormEvent, useEffect } from "react";
+import { useState, FormEvent } from "react";
 import { Link, useLocation } from "wouter";
-import { Header } from "@/components/Header";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { useOwnerAuth } from "@/hooks/useOwnerAuth";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { loginOwner } from "@/api/ownerApi";
 import { useToast } from "@/hooks/use-toast";
 
 export default function OwnerLogin() {
   const [, setLocation] = useLocation();
-  const { login, isAuthenticated } = useOwnerAuth();
   const { toast } = useToast();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      setLocation("/owner/home");
-    }
-  }, [isAuthenticated, setLocation]);
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      const response = await loginOwner({ email, password });
+      
+      // Save token and owner info
+      // Backend returns: { success, message, user, token }
+      const { token, user } = response.data;
+      if (token && user) {
+        localStorage.setItem("owner_token", token);
+        localStorage.setItem("owner_id", user._id);
+        localStorage.setItem("owner", JSON.stringify(user));
+      }
+      
       toast({
         title: "Login Successful",
         description: "Welcome back!",
       });
+      
       setLocation("/owner/home");
     } catch (error: any) {
       toast({
@@ -47,12 +51,19 @@ export default function OwnerLogin() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-
       <main className="container max-w-md mx-auto px-4 py-16">
+        <div className="flex items-center gap-4 mb-6">
+          <Link href="/">
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-bold">Owner Login</h1>
+        </div>
+
         <Card>
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold">Owner Login</CardTitle>
+            <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
             <CardDescription>
               Sign in to manage your restaurants
             </CardDescription>
@@ -65,7 +76,7 @@ export default function OwnerLogin() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="owner@example.com"
+                  placeholder="BunMamBacLieu@gmail.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -86,9 +97,7 @@ export default function OwnerLogin() {
                   data-testid="password-input"
                 />
               </div>
-            </CardContent>
 
-            <CardFooter className="flex flex-col space-y-4">
               <Button
                 type="submit"
                 className="w-full"
@@ -98,15 +107,13 @@ export default function OwnerLogin() {
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
 
-              <div className="text-sm text-center text-muted-foreground">
+              <div className="text-sm text-center text-muted-foreground mt-4">
                 Don't have an account?{" "}
-                <Link href="/owner/register">
-                  <a className="text-primary hover:underline font-medium">
-                    Register as Owner
-                  </a>
+                <Link href="/owner/register" className="text-primary hover:underline font-medium">
+                  Register as Owner
                 </Link>
               </div>
-            </CardFooter>
+            </CardContent>
           </form>
         </Card>
       </main>
