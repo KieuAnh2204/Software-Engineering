@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "Order Service - Cart & Orders",
+    "name": "Order Service - Cart & Orders v2",
     "_postman_id": "8b3d7b56-87f5-4f0e-9a45-66b2a4a6f1c9",
     "description": "Postman collection to test the cart → checkout → orders flow for the order-service.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
@@ -8,6 +8,7 @@
   "variable": [
     { "key": "base_url", "value": "http://localhost:3002" },
     { "key": "customer_token", "value": "" },
+    { "key": "owner_token", "value": "" },
     { "key": "restaurant_id", "value": "" },
     { "key": "product_id", "value": "" },
     { "key": "item_id", "value": "" },
@@ -251,6 +252,74 @@
               "path": ["api", "orders", "{{order_id}}"]
             },
             "description": "Gets full details of a single order for the authenticated customer. Set {{order_id}} from a previous response."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/orders/:orderId/mock-pay - Simulate Payment Success",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/{{order_id}}/mock-pay",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "{{order_id}}", "mock-pay"]
+            },
+            "description": "Simulates a successful payment for an order (dev only). Marks payment_status='paid' and status='confirmed' when appropriate. Use the order_id from checkout or list orders."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Restaurant",
+      "item": [
+        {
+          "name": "GET /api/orders/restaurant - List Restaurant Orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{owner_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders/restaurant?restaurant_id={{restaurant_id}}&status=submitted,payment_pending,confirmed,preparing,ready_for_pickup,delivering&page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "restaurant"],
+              "query": [
+                { "key": "restaurant_id", "value": "{{restaurant_id}}" },
+                {
+                  "key": "status",
+                  "value": "submitted,payment_pending,confirmed,preparing,ready_for_pickup,delivering"
+                },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Lists orders for a given restaurant_id for restaurant owner/admin. Use an owner token and their restaurant_id."
           },
           "response": []
         }

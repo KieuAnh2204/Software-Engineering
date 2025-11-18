@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { loginOwner } from "@/api/ownerApi";
 import { useToast } from "@/hooks/use-toast";
+import { useOwnerAuth } from "@/hooks/useOwnerAuth";
 
 export default function OwnerLogin() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { login } = useOwnerAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,16 +22,7 @@ export default function OwnerLogin() {
     setIsLoading(true);
 
     try {
-      const response = await loginOwner({ email, password });
-      
-      // Save token and owner info
-      // Backend returns: { success, message, user, token }
-      const { token, user } = response.data;
-      if (token && user) {
-        localStorage.setItem("owner_token", token);
-        localStorage.setItem("owner_id", user._id);
-        localStorage.setItem("owner", JSON.stringify(user));
-      }
+      await login(email, password);
       
       toast({
         title: "Login Successful",
