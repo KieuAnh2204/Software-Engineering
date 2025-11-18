@@ -49,7 +49,6 @@ export default function RestaurantRegister() {
         description,
         phone,
         address,
-        logo_url: logoUrl || undefined,
         open_time: openTime,
         close_time: closeTime,
       });

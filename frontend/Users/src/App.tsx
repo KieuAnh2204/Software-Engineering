@@ -24,6 +24,7 @@ import RestaurantOwnerLogin from "@/pages/RestaurantOwnerLogin";
 import RestaurantOwnerDashboard from "@/pages/RestaurantOwnerDashboard";
 import OwnerLogin from "@/pages/OwnerLogin";
 import OwnerRegister from "@/pages/OwnerRegister";
+import OwnerCreateRestaurant from "@/pages/OwnerCreateRestaurant";
 import OwnerHome from "@/pages/OwnerHome";
 import RestaurantRegister from "@/pages/RestaurantRegister";
 import OwnerDashboard from "@/pages/OwnerDashboard";
@@ -44,6 +45,7 @@ function Router() {
       <Route path="/owner/login" component={RestaurantOwnerLogin} />
       <Route path="/owner" component={RestaurantOwnerDashboard} />
       <Route path="/owner/register" component={OwnerRegister} />
+      <Route path="/owner/create-restaurant" component={OwnerCreateRestaurant} />
       <Route path="/owner/auth/login" component={OwnerLogin} />
       <Route path="/owner/home" component={OwnerHome} />
       <Route path="/owner/restaurant/new" component={RestaurantRegister} />

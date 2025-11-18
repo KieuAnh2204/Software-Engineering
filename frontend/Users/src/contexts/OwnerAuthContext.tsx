@@ -75,11 +75,10 @@ export function OwnerAuthProvider({ children }: { children: ReactNode }) {
       username,
       name,
       logo_url: logo_url || "",
-      phone: phone || "",
-      address: address || "",
     });
 
-    const { token, owner: ownerData } = response.data;
+    // Backend returns: { success, message, user, token }
+    const { token, user: ownerData } = response.data;
 
     if (token) {
       localStorage.setItem("owner_token", token);
@@ -101,7 +100,8 @@ export function OwnerAuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const response = await loginOwner({ email, password });
-    const { token, owner: ownerData } = response.data;
+    // Backend returns: { success, message, user, token }
+    const { token, user: ownerData } = response.data;
 
     if (token) {
       localStorage.setItem("owner_token", token);
@@ -112,9 +112,9 @@ export function OwnerAuthProvider({ children }: { children: ReactNode }) {
 
     const mappedOwner: Owner = {
       id: ownerData?._id || ownerData?.id || "",
-      email: ownerData?.user?.email || ownerData?.email || email,
-      username: ownerData?.user?.username || ownerData?.username || "",
-      name: ownerData?.display_name || "",
+      email: ownerData?.email || email,
+      username: ownerData?.username || "",
+      name: ownerData?.full_name || ownerData?.name || "",
       status: ownerData?.status || "PENDING",
     };
 
