@@ -1,0 +1,274 @@
+{
+  "info": {
+    "name": "User Service API",
+    "_postman_id": "c4a1c220-0000-4000-8000-aaaaaaaaaaaa",
+    "description": "Postman collection for testing user-service authentication, profile, and admin user management endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3001" },
+    { "key": "customer_email", "value": "customer@example.com" },
+    { "key": "customer_password", "value": "password123" },
+    { "key": "owner_email", "value": "owner@example.com" },
+    { "key": "owner_password", "value": "password123" },
+    { "key": "admin_email", "value": "admin@example.com" },
+    { "key": "admin_password", "value": "password123" },
+    { "key": "customer_token", "value": "" },
+    { "key": "owner_token", "value": "" },
+    { "key": "admin_token", "value": "" },
+    { "key": "owner_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth - Generic & Role-specific Registration",
+      "item": [
+        {
+          "name": "POST /api/auth/register - Generic Register (role = customer | owner)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"customer\",\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"{{customer_password}}\",\n  \"username\": \"test_customer\",\n  \"full_name\": \"Test Customer\",\n  \"phone\": \"0123456789\",\n  \"address\": \"123 Test Street\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Generic registration endpoint that accepts role = 'customer' or 'owner'. Payload requirements depend on the role."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/register/customer - Register Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"{{customer_password}}\",\n  \"username\": \"test_customer2\",\n  \"full_name\": \"Test Customer 2\",\n  \"phone\": \"0123456790\",\n  \"address\": \"456 Another Street\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register/customer",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register", "customer"]
+            },
+            "description": "Registers a new customer account."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/register/owner - Register Restaurant Owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_password}}\",\n  \"username\": \"test_owner\",\n  \"name\": \"Test Owner\",\n  \"logo_url\": \"https://example.com/logo.png\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register/owner",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register", "owner"]
+            },
+            "description": "Registers a new restaurant owner account."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth - Login",
+      "item": [
+        {
+          "name": "POST /api/auth/login/customer - Customer Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"{{customer_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login/customer",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login", "customer"]
+            },
+            "description": "Logs in as a customer. Copy the returned token into {{customer_token}}."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/login/owner - Owner Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login/owner",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login", "owner"]
+            },
+            "description": "Logs in as a restaurant owner. Copy the returned token into {{owner_token}}."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/login/admin - Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login/admin",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login", "admin"]
+            },
+            "description": "Logs in as an admin. Copy the returned token into {{admin_token}}."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth - Me & Profile",
+      "item": [
+        {
+          "name": "GET /api/auth/customers/me - Current Customer",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/customers/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "customers", "me"]
+            },
+            "description": "Returns the authenticated customer's user + profile info."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/auth/owners/me - Current Owner",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{owner_token}}", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/owners/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "owners", "me"]
+            },
+            "description": "Returns the authenticated restaurant owner's user + profile info."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /api/auth/profile - Update Customer Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Updated Name\",\n  \"phone\": \"0987654321\",\n  \"address\": \"789 Updated Street\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "profile"]
+            },
+            "description": "Updates the authenticated customer's profile fields. All fields are optional but validated when present."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin - User Management (/api/users)",
+      "item": [
+        {
+          "name": "GET /api/users/customers - List All Customers",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/users/customers",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users", "customers"]
+            },
+            "description": "Returns a list of all customers. Requires admin token."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/users/owners - List All Restaurant Owners",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/users/owners",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users", "owners"]
+            },
+            "description": "Returns a list of all restaurant owners. Requires admin token."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /api/users/owners/:id/status - Update Owner Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/users/owners/{{owner_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users", "owners", "{{owner_id}}", "status"]
+            },
+            "description": "Updates a restaurant owner's status (e.g., pending → approved). Use an owner _id from GET /api/users/owners."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
+

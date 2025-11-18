@@ -1,316 +1,172 @@
+import Customer from '../models/Customer.js';
+import RestaurantOwner from '../models/RestaurantOwner.js';
 import User from '../models/User.js';
 
-// @desc    Get all users
-// @route   GET /api/users
-// @access  Private/Admin
-export const getAllUsers = async (req, res, next) => {
+export const getAllCustomers = async (req, res) => {
   try {
-    const { page = 1, limit = 10, role, isActive } = req.query;
-    
-    const query = {};
-    if (role) query.role = role;
-    if (isActive !== undefined) query.isActive = isActive === 'true';
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = (page - 1) * limit;
 
-    const users = await User.find(query)
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort({ createdAt: -1 });
+    const [customers, total] = await Promise.all([
+      Customer.find()
+        .populate('user', '-password')
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 }),
+      Customer.countDocuments()
+    ]);
 
-    const count = await User.countDocuments(query);
-
-    res.status(200).json({
+    res.json({
       success: true,
-      data: users,
+      data: customers,
       pagination: {
         currentPage: page,
-        totalPages: Math.ceil(count / limit),
-        totalUsers: count
+        totalPages: Math.ceil(total / limit),
+        totalItems: total,
+        itemsPerPage: limit
       }
     });
   } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Get user by ID
-// @route   GET /api/users/:id
-// @access  Private
-export const getUserById = async (req, res, next) => {
-  try {
-    // Users can only view their own profile unless they're admin
-    if (req.user.role !== 'admin' && req.user.id !== req.params.id) {
-      return res.status(403).json({ message: 'Not authorized to view this profile' });
-    }
-
-    const user = await User.findById(req.params.id);
-    
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: user
+    console.error('Error getting customers:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving customers',
+      error: error.message
     });
-  } catch (error) {
-    next(error);
   }
 };
 
-// @desc    Update user
-// @route   PUT /api/users/:id
-// @access  Private
-export const updateUser = async (req, res, next) => {
+export const getAllRestaurantOwners = async (req, res) => {
   try {
-    // Users can only update their own profile unless they're admin
-    if (req.user.role !== 'admin' && req.user.id !== req.params.id) {
-      return res.status(403).json({ message: 'Not authorized to update this profile' });
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+    const status = req.query.status;
+
+    const query = {};
+    if (status) {
+      query.status = status;
     }
 
-    const { fullName, phone, address } = req.body;
-    
-    // Only allow certain fields to be updated
-    const updateData = {};
-    if (fullName !== undefined) updateData.fullName = fullName;
-    if (phone !== undefined) updateData.phone = phone;
-    if (address !== undefined) updateData.address = address;
+    const [owners, total] = await Promise.all([
+      RestaurantOwner.find(query)
+        .populate('user', '-password')
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 }),
+      RestaurantOwner.countDocuments(query)
+    ]);
 
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true, runValidators: true }
-    );
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    res.status(200).json({
+    res.json({
       success: true,
-      data: user
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Delete user (soft delete)
-// @route   DELETE /api/users/:id
-// @access  Private/Admin
-export const deleteUser = async (req, res, next) => {
-  try {
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { isActive: false },
-      { new: true }
-    );
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'User deactivated successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// ========== RESTAURANT ROUTES ==========
-
-// @desc    Get all restaurants
-// @route   GET /api/users/restaurants
-// @access  Public
-export const getAllRestaurants = async (req, res, next) => {
-  try {
-    const { 
-      page = 1, 
-      limit = 10, 
-      isAcceptingOrders, 
-      isVerified,
-      cuisineType,
-      priceRange,
-      city,
-      district
-    } = req.query;
-    
-    const query = { 
-      role: 'restaurant',
-      isActive: true
-    };
-    
-    // Filter options
-    if (isAcceptingOrders !== undefined) {
-      query['restaurantProfile.isAcceptingOrders'] = isAcceptingOrders === 'true';
-    }
-    if (isVerified !== undefined) {
-      query['restaurantProfile.isVerified'] = isVerified === 'true';
-    }
-    if (cuisineType) {
-      query['restaurantProfile.cuisineType'] = cuisineType;
-    }
-    if (priceRange) {
-      query['restaurantProfile.priceRange'] = priceRange;
-    }
-    if (city) {
-      query['restaurantProfile.address.city'] = new RegExp(city, 'i');
-    }
-    if (district) {
-      query['restaurantProfile.address.district'] = new RegExp(district, 'i');
-    }
-
-    const restaurants = await User.find(query)
-      .select('-password')
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort({ 'restaurantProfile.rating.average': -1, createdAt: -1 });
-
-    const count = await User.countDocuments(query);
-
-    res.status(200).json({
-      success: true,
-      data: restaurants,
+      data: owners,
       pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(count / limit),
-        totalRestaurants: count
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalItems: total,
+        itemsPerPage: limit
       }
     });
   } catch (error) {
-    next(error);
+    console.error('Error getting restaurant owners:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving restaurant owners',
+      error: error.message
+    });
   }
 };
 
-// @desc    Get restaurant by ID
-// @route   GET /api/users/restaurants/:id
-// @access  Public
-export const getRestaurantById = async (req, res, next) => {
+export const updateRestaurantOwnerStatus = async (req, res) => {
   try {
-    const restaurant = await User.findOne({
-      _id: req.params.id,
-      role: 'restaurant',
-      isActive: true
-    }).select('-password');
-    
-    if (!restaurant) {
-      return res.status(404).json({ 
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!['APPROVED', 'REJECTED', 'SUSPENDED'].includes(status)) {
+      return res.status(400).json({
         success: false,
-        message: 'Restaurant not found' 
+        message: 'Invalid status. Allowed: APPROVED, REJECTED, SUSPENDED'
       });
     }
 
-    res.status(200).json({
-      success: true,
-      data: restaurant
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Search restaurants
-// @route   GET /api/users/restaurants/search
-// @access  Public
-export const searchRestaurants = async (req, res, next) => {
-  try {
-    const { 
-      q, 
-      cuisine, 
-      city, 
-      district,
-      priceRange,
-      minRating,
-      isAcceptingOrders = true
-    } = req.query;
-    
-    const query = { 
-      role: 'restaurant',
-      isActive: true,
-      'restaurantProfile.isAcceptingOrders': isAcceptingOrders === 'true'
-    };
-    
-    // Text search in restaurant name or description
-    if (q) {
-      query.$or = [
-        { 'restaurantProfile.restaurantName': new RegExp(q, 'i') },
-        { 'restaurantProfile.description': new RegExp(q, 'i') }
-      ];
-    }
-    
-    // Filter by cuisine type
-    if (cuisine) {
-      query['restaurantProfile.cuisineType'] = cuisine;
-    }
-    
-    // Filter by location
-    if (city) {
-      query['restaurantProfile.address.city'] = new RegExp(city, 'i');
-    }
-    if (district) {
-      query['restaurantProfile.address.district'] = new RegExp(district, 'i');
-    }
-    
-    // Filter by price range
-    if (priceRange) {
-      query['restaurantProfile.priceRange'] = priceRange;
-    }
-    
-    // Filter by minimum rating
-    if (minRating) {
-      query['restaurantProfile.rating.average'] = { $gte: parseFloat(minRating) };
-    }
-
-    const restaurants = await User.find(query)
-      .select('-password')
-      .sort({ 'restaurantProfile.rating.average': -1 })
-      .limit(20);
-
-    res.status(200).json({
-      success: true,
-      count: restaurants.length,
-      data: restaurants
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Update restaurant accepting orders status
-// @route   PUT /api/users/restaurants/:id/status
-// @access  Private (Restaurant owner only)
-export const updateRestaurantStatus = async (req, res, next) => {
-  try {
-    // Only restaurant owner can update their own status
-    if (req.user.role !== 'restaurant' || req.user.id !== req.params.id) {
-      return res.status(403).json({ 
-        success: false,
-        message: 'Not authorized to update this restaurant' 
-      });
-    }
-
-    const { isAcceptingOrders } = req.body;
-    
-    const restaurant = await User.findByIdAndUpdate(
-      req.params.id,
-      { 'restaurantProfile.isAcceptingOrders': isAcceptingOrders },
+    const owner = await RestaurantOwner.findByIdAndUpdate(
+      id,
+      { status },
       { new: true, runValidators: true }
-    ).select('-password');
+    ).populate('user', '-password');
 
-    if (!restaurant) {
-      return res.status(404).json({ 
+    if (!owner) {
+      return res.status(404).json({
         success: false,
-        message: 'Restaurant not found' 
+        message: 'Restaurant owner not found'
       });
     }
 
-    res.status(200).json({
+    res.json({
       success: true,
-      data: restaurant
+      message: `Restaurant owner status updated to ${status}`,
+      data: owner
     });
   } catch (error) {
-    next(error);
+    console.error('Error updating owner status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating owner status',
+      error: error.message
+    });
   }
 };
 
+// Update customer profile
+export const updateCustomerProfile = async (req, res) => {
+  try {
+    const userId = req.user.id; // From auth middleware
+    const { full_name, phone, address } = req.body;
+
+    // Find customer by user ID
+    const customer = await Customer.findOne({ user: userId });
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Customer profile not found'
+      });
+    }
+
+    // Update customer fields
+    if (full_name !== undefined) customer.full_name = full_name;
+    if (phone !== undefined) customer.phone = phone;
+    if (address !== undefined) customer.address = address;
+
+    await customer.save();
+
+    // Get updated user info
+    const user = await User.findById(userId).select('-password');
+
+    // Return merged response
+    const responseUser = {
+      _id: user._id,
+      email: user.email,
+      username: user.username,
+      full_name: customer.full_name,
+      phone: customer.phone,
+      address: customer.address,
+      role: user.role,
+      created_at: user.createdAt,
+      updated_at: user.updatedAt
+    };
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: responseUser
+    });
+  } catch (error) {
+    console.error('Error updating customer profile:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating profile',
+      error: error.message
+    });
+  }
+};

@@ -1,5 +1,15 @@
+version: "3.9"
+
 services:
-  # User Service
+  mongo:
+    image: mongo:7
+    container_name: mongo
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - app-network
+
   user-service:
     build:
       context: ./services/user-service
@@ -9,21 +19,14 @@ services:
     ports:
       - "3001:3001"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - PORT=3001
-      - MONGODB_URI=${USER_SERVICE_MONGODB_URI}
-      - JWT_SECRET=${JWT_SECRET}
+      - MONGODB_URI=mongodb+srv://foodfast_delivery:foodfast_delivery@cluster0.r3lhqwd.mongodb.net/user_service?retryWrites=true&w=majority&appName=Cluster0
+      - JWT_SECRET=2ff1011a2f5e65f72b80d9a0667a942b388bab6dc4637f681118a571b07b00474
       - JWT_EXPIRE=7d
-      - CORS_ORIGIN=${CORS_ORIGIN}
     networks:
-      - microservices-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - app-network
 
-  # Product Service
   product-service:
     build:
       context: ./services/product-service
@@ -33,19 +36,13 @@ services:
     ports:
       - "3003:3003"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - PORT=3003
-      - MONGODB_URI=${PRODUCT_SERVICE_MONGODB_URI}
-      - JWT_SECRET=${JWT_SECRET}
+      - MONGODB_URI=mongodb+srv://foodfast_delivery:foodfast_delivery@cluster0.r3lhqwd.mongodb.net/product_service?retryWrites=true&w=majority&appName=Cluster0
+      - JWT_SECRET=2ff1011a2f5e65f72b80d9a0667a942b388bab6dc4637f681118a571b07b00474
     networks:
-      - microservices-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - app-network
 
-  # Order Service
   order-service:
     build:
       context: ./services/order-service
@@ -55,55 +52,41 @@ services:
     ports:
       - "3002:3002"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - PORT=3002
-      - MONGODB_URI=${ORDER_SERVICE_MONGODB_URI}
-      - JWT_SECRET=${JWT_SECRET}
-      - USER_SERVICE_URL=http://user-service:3001
+      - MONGODB_URI=mongodb+srv://foodfast_delivery:foodfast_delivery@cluster0.r3lhqwd.mongodb.net/order_service?retryWrites=true&w=majority&appName=Cluster0
+      - JWT_SECRET=2ff1011a2f5e65f72b80d9a0667a942b388bab6dc4637f681118a571b07b00474
       - PRODUCT_SERVICE_URL=http://product-service:3003
       - PAYMENT_SERVICE_URL=http://payment-service:3004
     depends_on:
       - user-service
       - product-service
     networks:
-      - microservices-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - app-network
 
-  # Payment Service
-  payment-service:
-    build:
-      context: ./services/payment-service
-      dockerfile: Dockerfile
-    container_name: payment-service
-    restart: unless-stopped
-    ports:
-      - "3004:3004"
+  frontend:
+    image: node:20
+    container_name: frontend
+    working_dir: /app/Users
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5000"
+    volumes:
+      - ./frontend:/app
     environment:
-      - NODE_ENV=production
-      - PORT=3004
-      - MONGODB_URI=${PAYMENT_SERVICE_MONGODB_URI}
-      - JWT_SECRET=${JWT_SECRET}
-      - ORDER_SERVICE_URL=http://order-service:3002
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - VITE_USER_API=http://localhost:3001/api/auth
+      - VITE_PRODUCT_API=http://localhost:3003/api
+      - NODE_ENV=development
+    ports:
+      - "5000:5000"
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
     networks:
-      - microservices-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3004/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - app-network
 
 networks:
-  microservices-network:
+  app-network:
     driver: bridge
 
 volumes:
-  user-service-data:
-  product-service-data:
-  order-service-data:
-  payment-service-data:
+  mongo-data:

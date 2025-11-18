@@ -1,0 +1,109 @@
+openapi: 3.0.3
+info:
+  title: Order Service API
+  version: 1.0.0
+servers:
+  - url: http://localhost:3002
+paths:
+  /health:
+    get:
+      summary: Healthcheck
+      responses:
+        '200':
+          description: OK
+  /api/orders:
+    get:
+      summary: List orders
+      parameters:
+        - in: query
+          name: customer_id
+          schema: { type: string }
+        - in: query
+          name: restaurant_id
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer }
+        - in: query
+          name: limit
+          schema: { type: integer }
+      responses:
+        '200': { description: OK }
+    post:
+      summary: Create order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customer_id: { type: string }
+                restaurant_id: { type: string }
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      dish_id: { type: string }
+                      quantity: { type: integer }
+      responses:
+        '201': { description: Created }
+  /api/orders/{id}:
+    get:
+      summary: Get order
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /api/orders/{id}/pay:
+    post:
+      summary: Create VNPay payment intent
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /api/orders/payment/webhook/vnpay:
+    post:
+      summary: VNPay webhook callback
+      responses:
+        '200': { description: OK }
+  /api/orders/{id}/restaurant-confirm:
+    post:
+      summary: Restaurant confirm -> Delivering
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /api/orders/{id}/complete:
+    post:
+      summary: Delivering -> Completed
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /api/orders/{id}/cancel:
+    post:
+      summary: Cancel order
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }

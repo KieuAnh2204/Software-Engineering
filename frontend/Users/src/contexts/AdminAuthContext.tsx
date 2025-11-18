@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { loginAdmin } from "@/api/auth";
 
 interface AdminUser {
   id: string;
@@ -16,7 +17,7 @@ interface AdminAuthContextType {
 
 const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined);
 
-export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
+export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [admin, setAdmin] = useState<AdminUser | null>(() => {
     const stored = localStorage.getItem("admin");
     return stored ? JSON.parse(stored) : null;
@@ -31,27 +32,18 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   }, [admin]);
 
   const adminLogin = async (username: string, password: string) => {
-    const response = await fetch("/api/auth/admin/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
+    const response = await loginAdmin({ email: username, password });
+    const data = response.data;
+    const adminPayload = data?.admin || data?.user || data;
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Login failed");
-    }
-
-    const adminData = await response.json();
-    
-    const admin: AdminUser = {
-      id: adminData.id,
-      username: adminData.username,
-      email: adminData.email || `${adminData.username}@foodfast.com`,
-      role: adminData.role === "superadmin" ? "superadmin" : "admin",
+    const mapped: AdminUser = {
+      id: adminPayload?.id || adminPayload?._id || username,
+      username: adminPayload?.username || username,
+      email: adminPayload?.email || `${adminPayload?.username || username}@foodfast.com`,
+      role: adminPayload?.role === "superadmin" ? "superadmin" : "admin",
     };
-    
-    setAdmin(admin);
+
+    setAdmin(mapped);
   };
 
   const adminLogout = () => {

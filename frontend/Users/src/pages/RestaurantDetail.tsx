@@ -6,7 +6,7 @@ import { LoginDialog } from "@/components/LoginDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { Link } from "wouter";
 import italianRestaurant from "@assets/generated_images/Italian_restaurant_exterior_b7a0fbc1.png";
 import burgerImage from "@assets/generated_images/Gourmet_burger_meal_380ed3c8.png";

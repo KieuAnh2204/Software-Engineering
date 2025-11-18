@@ -1,26 +1,23 @@
 const express = require('express');
 const router = express.Router();
-const {
-  getAllOrders,
-  getOrder,
-  createOrder,
-  updateOrderStatus,
-  cancelOrder,
-  getUserOrders,
-  getRestaurantOrders
-} = require('../controllers/orderController');
+const { authenticate } = require('../middleware/auth');
 
-router.route('/')
-  .get(getAllOrders)
-  .post(createOrder);
+const cart = require('../controllers/cartController');
+const order = require('../controllers/orderController');
 
-router.route('/:id')
-  .get(getOrder);
+router.use(authenticate);
 
-router.put('/:id/status', updateOrderStatus);
-router.put('/:id/cancel', cancelOrder);
+// cart
+router.get('/cart', cart.getCart);
+router.post('/cart/items', cart.addItem);
+router.patch('/cart/items/:itemId', cart.updateItem);
+router.delete('/cart/items/:itemId', cart.removeItem);
+router.delete('/cart', cart.clearCart);
+router.post('/cart/checkout', cart.checkout);
 
-router.get('/user/:userId', getUserOrders);
-router.get('/restaurant/:restaurantId', getRestaurantOrders);
+// history
+router.get('/', order.listOrders);
+router.get('/:orderId', order.getOrder);
 
 module.exports = router;
+
