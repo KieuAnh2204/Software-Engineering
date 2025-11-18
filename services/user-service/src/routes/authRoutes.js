@@ -29,7 +29,14 @@ const ownerRegisterValidation = [
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('username').isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
   body('name').notEmpty().withMessage('Owner display name is required'),
-  body('logo_url').optional().isURL().withMessage('Logo URL must be valid')
+  body('logo_url').custom((value) => {
+    if (!value || value.trim() === '') return true; // Allow empty
+    const urlPattern = /^https?:\/\/.+/;
+    if (!urlPattern.test(value)) {
+      throw new Error('Logo URL must be valid');
+    }
+    return true;
+  })
 ];
 
 const genericRegisterValidation = [

@@ -1,91 +1,115 @@
-# FoodFast Delivery – Microservices Architecture
-> A scalable, cloud-native microservices platform for online food ordering.
+# FoodFast Delivery – Kiến trúc Microservices
+> Nền tảng microservices có khả năng mở rộng, cloud-native cho đặt đồ ăn trực tuyến.
+---
 
-## 📚 Table of Contents
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Tech Stack](#tech-stack)
-- [Screenshots (placeholder)](#screenshots-placeholder)
-- [Prerequisites](#prerequisites)
-- [Repository Layout](#repository-layout)
-- [Environment Variables](#environment-variables)
-- [Running Locally with Docker Compose](#running-locally-with-docker-compose)
-- [Running on Kubernetes](#running-on-kubernetes)
-- [Microservices & Endpoints](#microservices--endpoints)
-- [Frontend Setup](#frontend-setup)
-- [Testing & Linting](#testing--linting)
-- [Troubleshooting](#troubleshooting)
-- [Demo & Submission](#demo--submission)
+# SGU2025_CNPM_NHOM11
+
+**Học phần:** Công nghệ phần mềm  
+**Giảng viên:** TS. Nguyễn Quốc Huy  
+**Lớp:** DCT122C5  
+**Nhóm:** 11  
+
+---
+# Tên đề tài
+**Tạo 4 services (User, Product, Order, Payment) giao tiếp với nhau**
+
+# Giới thiệu & mô tả
+FoodFast Drone Delivery là hệ thống giao đồ ăn nhanh bằng drone, mang đến trải nghiệm giao hàng hiện đại và tiện lợi.  
+Người dùng có thể đặt món ăn từ các cửa hàng đối tác, thanh toán trực tuyến qua QR code, và nhận đồ ăn trực tiếp từ drone tại vị trí của mình.
 
 ---
 
-## Overview
-FoodFast Delivery is a cloud-native, domain-driven platform for online food ordering. It supports three core personas:
-- **Customer** – browses menus, places orders, tracks status.
-- **Restaurant Owner** – manages restaurants and dishes.
-- **Super Admin** – governs the entire platform.
+# Thành viên
+| Họ và tên | Mã số sinh viên |
+|-----------|------------------|
+| Võ Kiều Anh | 3122411009 |
+| Hồ Đăng Khoa | 3122411195 |
+---
+## Mục lục
+- [Tổng quan](#tổng-quan)
+- [Kiến trúc](#kiến-trúc)
+- [Công nghệ sử dụng](#công-nghệ-sử-dụng)
+- [Ảnh chụp màn hình](#ảnh-chụp-màn-hình)
+- [Yêu cầu](#yêu-cầu)
+- [Cấu trúc thư mục](#cấu-trúc-thư-mục)
+- [Biến môi trường](#biến-môi-trường)
+- [Chạy local với Docker Compose](#chạy-local-với-docker-compose)
+- [Chạy trên Kubernetes](#chạy-trên-kubernetes)
+- [Microservices và Endpoints](#microservices-và-endpoints)
+- [Cài đặt Frontend](#cài-đặt-frontend)
+- [Testing và Linting](#testing-và-linting)
+- [Xử lý sự cố](#xử-lý-sự-cố)
+- [Demo và Nộp bài](#demo-và-nộp-bài)
 
-| Service | Responsibility | Port |
+---
+
+## Tổng quan
+FoodFast Delivery là một nền tảng cloud-native, domain-driven để đặt đồ ăn trực tuyến. Hệ thống hỗ trợ ba vai trò chính:
+- **Customer (Khách hàng)** – duyệt menu, đặt hàng, theo dõi trạng thái.
+- **Restaurant Owner (Chủ nhà hàng)** – quản lý nhà hàng và món ăn.
+- **Super Admin (Quản trị viên)** – quản lý toàn bộ nền tảng.
+
+| Service | Chức năng | Port |
 | --- | --- | --- |
-| **User Service** | Authentication, Customer and Restaurant Owner identities, Super Admin management | `3001` |
-| **Product Service** | Restaurant and Dish lifecycle, availability, ownership (no brand concept) | `3003` |
-| **Order Service** | Orders and Order Items workflow, status tracking | `3002` |
-| **Payment Service** | VNPay integration, payment callbacks, transaction logs | `3004` |
-| **Frontend** | React UI for Customers, Owners, Super Admin | `3000` |
+| **User Service** | Xác thực, quản lý danh tính Customer và Restaurant Owner, quản lý Super Admin | `3001` |
+| **Product Service** | Quản lý vòng đời Restaurant và Dish, tính khả dụng, quyền sở hữu | `3003` |
+| **Order Service** | Quy trình Orders và Order Items, theo dõi trạng thái | `3002` |
+| **Payment Service** | Tích hợp VNPay, xử lý payment callbacks, ghi log giao dịch | `3004` |
+| **Frontend** | Giao diện React cho Customers, Owners, Super Admin | `3000` |
 
-**Service Interaction Diagram**
-- Customer/Owner/Super Admin → **Frontend** → API Gateway/Ingress → **User Service** for auth (`JWT`).
-- Frontend fetches restaurants/dishes from **Product Service**.
-- Checkout triggers **Order Service**, which emits events to **Payment Service**.
-- **Payment Service** communicates with **VNPay** and emits payment status events consumed by **Order Service**.
+**Sơ đồ tương tác giữa các Service**
+- Customer/Owner/Super Admin → **Frontend** → API Gateway/Ingress → **User Service** để xác thực (`JWT`).
+- Frontend lấy thông tin restaurants/dishes từ **Product Service**.
+- Checkout kích hoạt **Order Service**, service này phát ra events đến **Payment Service**.
+- **Payment Service** giao tiếp với **VNPay** và phát ra payment status events được **Order Service** nhận.
 
 ---
 
-## Architecture
+## Kiến trúc
 - **Microservices**: User, Product, Order, Payment.
-- **API Gateway / Ingress**: Optional gateway (Nginx/Ingress) routes client traffic to services.
-- **MongoDB Atlas**: Primary database for all services (separate databases per service).
-- **Message Broker**: Kafka or RabbitMQ (pluggable) transports events between Order and Payment services.
-- **Docker Compose**: Local orchestration of all services.
-- **Kubernetes Manifests**: `k8s/` folder contains deployment, service, and secret manifests.
-- **REST APIs + JWT Auth**: Stateless authentication issued by the User Service and verified by downstream services.
-- **Event-Driven Communication**: Orders publish payment events; Payment Service pushes payment confirmations back.
+- **API Gateway / Ingress**: Gateway tùy chọn (Nginx/Ingress) định tuyến traffic từ client đến các services.
+- **MongoDB Atlas**: Cơ sở dữ liệu chính cho tất cả services (mỗi service có database riêng).
+- **Message Broker**: Kafka hoặc RabbitMQ (có thể thay đổi) truyền events giữa Order và Payment services.
+- **Docker Compose**: Điều phối local tất cả services.
+- **Kubernetes Manifests**: Thư mục `k8s/` chứa các manifests cho deployment, service và secrets.
+- **REST APIs + JWT Auth**: Xác thực stateless được cấp bởi User Service và xác minh bởi các downstream services.
+- **Event-Driven Communication**: Orders phát sự kiện thanh toán; Payment Service gửi lại xác nhận thanh toán.
 
 ---
 
-## Tech Stack
-| Layer | Technology |
+## Công nghệ sử dụng
+| Lớp | Công nghệ |
 | --- | --- |
 | Frontend | React + Vite (SPA) |
 | Backend | Node.js, Express.js |
 | Database | MongoDB Atlas (Mongoose ODM) |
 | Authentication | JWT, bcrypt hashing |
-| Realtime | Socket.IO (optional notification channel) |
-| Payments | VNPay (official REST APIs) |
-| Message Broker | Kafka or RabbitMQ (pluggable) |
+| Realtime | Socket.IO (kênh thông báo tùy chọn) |
+| Payments | VNPay (REST APIs chính thức) |
+| Message Broker | Kafka hoặc RabbitMQ (có thể thay đổi) |
 | Containerization | Docker + Docker Compose |
 | Orchestration | Kubernetes |
-| API Documentation | Swagger/OpenAPI (Payment + shared docs) |
+| API Documentation | Swagger/OpenAPI (Payment + tài liệu chung) |
 
 ---
 
-## Screenshots (placeholder)
-- Customer web dashboard – _coming soon_
-- Restaurant Owner console – _coming soon_
-- Super Admin console – _coming soon_
+## Ảnh chụp màn hình
+- Bảng điều khiển Customer – _sắp ra mắt_
+- Bảng điều khiển Restaurant Owner – _sắp ra mắt_
+- Bảng điều khiển Super Admin – _sắp ra mắt_
 
 ---
 
-## Prerequisites
+## Yêu cầu
 - Node.js v16+
 - Docker Desktop & `docker-compose`
-- Kubernetes cluster with `kubectl`
-- MongoDB Atlas URI (per service or shared cluster)
-- VNPay API credentials (TMN Code, Hash Secret, Return URL)
+- Kubernetes cluster với `kubectl`
+- MongoDB Atlas URI (cho mỗi service hoặc shared cluster)
+- Thông tin xác thực VNPay API (TMN Code, Hash Secret, Return URL)
 
 ---
 
-## Repository Layout
+## Cấu trúc thư mục
 ```
 Software-Engineering/
 ├─ services/
@@ -109,7 +133,7 @@ Software-Engineering/
 
 ---
 
-## Environment Variables
+## Biến môi trường
 ```env
 # MongoDB
 MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/foodfast
@@ -135,34 +159,34 @@ VNPAY_RETURN_URL=https://your-domain.com/payment/callback
 REACT_APP_BACKEND_URL=http://localhost:3001
 ```
 
-Each service can extend this template with service-specific variables (e.g., queue endpoints, logging).
+Mỗi service có thể mở rộng template này với các biến cụ thể cho service (ví dụ: queue endpoints, logging).
 
 ---
 
-## Running Locally with Docker Compose
+## Chạy local với Docker Compose
 ```bash
 docker-compose up --build
 docker-compose down
 ```
 
-**Default Ports**
+**Ports mặc định**
 - User Service `3001`
 - Order Service `3002`
 - Product Service `3003`
 - Payment Service `3004`
 - Frontend `3000`
 
-**Seed Super Admin (run once per environment)**
+**Khởi tạo Super Admin (chạy một lần cho mỗi môi trường)**
 ```bash
 cd services/user-service
 node src/seedAdmin.js
 ```
 
-Within the containers, services connect to MongoDB using `MONGO_URI` defined in `.env` or Docker secrets.
+Trong các containers, các services kết nối đến MongoDB sử dụng `MONGO_URI` được định nghĩa trong `.env` hoặc Docker secrets.
 
 ---
 
-## Running on Kubernetes
+## Chạy trên Kubernetes
 ```bash
 kubectl apply -f k8s/secrets.yaml
 kubectl apply -f k8s/deployment.yaml
@@ -172,69 +196,69 @@ kubectl get pods
 kubectl get svc
 ```
 
-- `secrets.yaml`: stores sensitive data (JWT secret, VNPay credentials, Mongo URIs).
-- `deployment.yaml`: defines Deployments for all microservices and the frontend.
-- `service.yaml`: exposes Deployments internally/externally (ClusterIP, NodePort, or LoadBalancer).
+- `secrets.yaml`: lưu trữ dữ liệu nhạy cảm (JWT secret, thông tin VNPay, Mongo URIs).
+- `deployment.yaml`: định nghĩa Deployments cho tất cả microservices và frontend.
+- `service.yaml`: expose Deployments ra ngoài/trong (ClusterIP, NodePort, hoặc LoadBalancer).
 
 ---
 
-## Microservices & Endpoints
+## Microservices và Endpoints
 
 ### User Service (Port 3001)
-| Endpoint | Method | Description | Auth |
+| Endpoint | Method | Mô tả | Xác thực |
 | --- | --- | --- | --- |
-| `/api/auth/register/customer` | POST | Register new customer | Public |
-| `/api/auth/register/owner` | POST | Register restaurant owner | Public |
-| `/api/auth/login/customer` | POST | Customer login | Public |
-| `/api/auth/login/owner` | POST | Owner login | Public |
-| `/api/auth/login/admin` | POST | Super Admin login | Public |
-| `/api/auth/customers/me` | GET | Customer profile | JWT (customer) |
-| `/api/auth/owners/me` | GET | Owner profile | JWT (owner) |
-| `/api/users/customers` | GET | List customers | JWT (admin) |
-| `/api/users/owners` | GET | List owners | JWT (admin) |
+| `/api/auth/register/customer` | POST | Đăng ký customer mới | Public |
+| `/api/auth/register/owner` | POST | Đăng ký restaurant owner | Public |
+| `/api/auth/login/customer` | POST | Đăng nhập customer | Public |
+| `/api/auth/login/owner` | POST | Đăng nhập owner | Public |
+| `/api/auth/login/admin` | POST | Đăng nhập Super Admin | Public |
+| `/api/auth/customers/me` | GET | Thông tin customer | JWT (customer) |
+| `/api/auth/owners/me` | GET | Thông tin owner | JWT (owner) |
+| `/api/users/customers` | GET | Danh sách customers | JWT (admin) |
+| `/api/users/owners` | GET | Danh sách owners | JWT (admin) |
 
 ### Product Service (Port 3003)
-| Endpoint | Method | Description | Auth |
+| Endpoint | Method | Mô tả | Xác thực |
 | --- | --- | --- | --- |
-| `/api/restaurants` | GET | List restaurants | Public |
-| `/api/restaurants/:id` | GET | Restaurant detail | Public |
-| `/api/restaurants` | POST | Create restaurant (owner/admin) | JWT (owner/admin) |
-| `/api/restaurants/:id` | PUT | Update restaurant | JWT (owner/admin) |
-| `/api/restaurants/:id/status` | PATCH | Toggle active/blocked | JWT (admin) |
-| `/api/dishes` | GET | List dishes (by restaurant, filters) | Public |
-| `/api/dishes/:id` | GET | Dish detail | Public |
-| `/api/dishes` | POST | Create dish | JWT (owner/admin) |
-| `/api/dishes/:id` | PUT | Update dish | JWT (owner/admin) |
-| `/api/dishes/:id` | DELETE | Remove dish | JWT (owner/admin) |
+| `/api/restaurants` | GET | Danh sách restaurants | Public |
+| `/api/restaurants/:id` | GET | Chi tiết restaurant | Public |
+| `/api/restaurants` | POST | Tạo restaurant (owner/admin) | JWT (owner/admin) |
+| `/api/restaurants/:id` | PUT | Cập nhật restaurant | JWT (owner/admin) |
+| `/api/restaurants/:id/status` | PATCH | Bật/tắt active/blocked | JWT (admin) |
+| `/api/dishes` | GET | Danh sách dishes (theo restaurant, filters) | Public |
+| `/api/dishes/:id` | GET | Chi tiết dish | Public |
+| `/api/dishes` | POST | Tạo dish | JWT (owner/admin) |
+| `/api/dishes/:id` | PUT | Cập nhật dish | JWT (owner/admin) |
+| `/api/dishes/:id` | DELETE | Xóa dish | JWT (owner/admin) |
 
 ### Order Service (Port 3002)
-| Endpoint | Method | Description | Auth |
+| Endpoint | Method | Mô tả | Xác thực |
 | --- | --- | --- | --- |
-| `/api/orders` | POST | Create order with items | JWT (customer) |
-| `/api/orders` | GET | List orders (by user or admin) | JWT |
-| `/api/orders/:id` | GET | Order detail | JWT |
-| `/api/orders/:id/status` | PATCH | Update order status | JWT (owner/admin) |
+| `/api/orders` | POST | Tạo order với items | JWT (customer) |
+| `/api/orders` | GET | Danh sách orders (theo user hoặc admin) | JWT |
+| `/api/orders/:id` | GET | Chi tiết order | JWT |
+| `/api/orders/:id/status` | PATCH | Cập nhật trạng thái order | JWT (owner/admin) |
 
 ### Payment Service (Port 3004)
-| Endpoint | Method | Description | Auth |
+| Endpoint | Method | Mô tả | Xác thực |
 | --- | --- | --- | --- |
-| `/api/payments/vnpay/create` | POST | Create VNPay transaction | JWT (customer) |
-| `/api/payments/vnpay/return` | GET | VNPay return handler | Public (VNPay callback) |
-| `/api/payments/:orderId` | GET | Get payment status by order | JWT |
+| `/api/payments/vnpay/create` | POST | Tạo giao dịch VNPay | JWT (customer) |
+| `/api/payments/vnpay/return` | GET | Xử lý VNPay return | Public (VNPay callback) |
+| `/api/payments/:orderId` | GET | Lấy trạng thái thanh toán theo order | JWT |
 
 ---
 
-## Frontend Setup
+## Cài đặt Frontend
 ```bash
 cd frontend/Users
 npm install
 npm start
 ```
-Open [http://localhost:3000](http://localhost:3000) to access the SPA.
+Mở [http://localhost:3000](http://localhost:3000) để truy cập SPA.
 
 ---
 
-## Testing & Linting
+## Testing và Linting
 **Backend**
 ```bash
 npm test
@@ -246,22 +270,22 @@ npm run lint
 npm test
 ```
 
-Run backend tests inside each service directory (e.g., `cd services/user-service && npm test`). Frontend tests run from `frontend/Users`.
+Chạy backend tests trong mỗi thư mục service (ví dụ: `cd services/user-service && npm test`). Frontend tests chạy từ `frontend/Users`.
 
 ---
 
-## Troubleshooting
-- **CORS Issues**: Update allowed origins in each service (`cors` middleware) and ensure the frontend URL is whitelisted.
-- **MongoDB Access**: Add your IP to the MongoDB Atlas network access list or switch to a VPC peering connection for production.
-- **VNPay Callbacks**: Verify the public callback URL is reachable, ensure the hash secret matches in VNPay dashboard, and validate timezone consistency.
+## Xử lý sự cố
+- **Vấn đề CORS**: Cập nhật allowed origins trong mỗi service (`cors` middleware) và đảm bảo frontend URL được whitelist.
+- **MongoDB Access**: Thêm IP của bạn vào danh sách network access list của MongoDB Atlas hoặc chuyển sang VPC peering connection cho production.
+- **VNPay Callbacks**: Xác minh public callback URL có thể truy cập được, đảm bảo hash secret khớp trong VNPay dashboard, và validate tính nhất quán của timezone.
 
 ---
 
-## Demo & Submission
-- **GitHub Repository**: _link pending_
-- **Demo Video**: _link pending_
-- **Team Members**: _names pending_
+## Demo và Nộp bài
+- **GitHub Repository**: _link đang chờ_
+- **Demo Video**: _link đang chờ_
+- **Thành viên nhóm**: _đang cập nhật_
 
 ---
 
-Made with ❤️ by the FoodFast Delivery engineering team.
+Được thực hiện với ❤️ bởi đội ngũ kỹ thuật FoodFast Delivery.
