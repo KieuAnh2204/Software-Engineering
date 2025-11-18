@@ -14,5 +14,17 @@ async function createIntent(orderId, amount) {
   });
 }
 
-module.exports = { createIntent };
+async function createVNPayPayment({ orderId, amount, orderInfo, returnUrl }) {
+  return withRetries(async () => {
+    const res = await http.post(`/api/payments/vnpay/create`, {
+      orderId,
+      amount,
+      orderInfo,
+      returnUrl,
+    });
+    return res.data || {};
+  });
+}
+
+module.exports = { createIntent, createVNPayPayment };
 

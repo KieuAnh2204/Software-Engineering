@@ -1,0 +1,650 @@
+{
+  "info": {
+    "name": "Order Processing Flow - FoodFast",
+    "description": "Complete order processing flow from cart to payment completion",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url_order",
+      "value": "http://localhost:3002",
+      "type": "string"
+    },
+    {
+      "key": "base_url_payment",
+      "value": "http://localhost:3004",
+      "type": "string"
+    },
+    {
+      "key": "base_url_product",
+      "value": "http://localhost:3003",
+      "type": "string"
+    },
+    {
+      "key": "base_url_user",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "restaurant_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "order_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "item_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "product_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Authentication",
+      "item": [
+        {
+          "name": "Login - Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('auth_token', jsonData.token || jsonData.data?.token);",
+                  "    pm.environment.set('auth_token', jsonData.token || jsonData.data?.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_user}}/api/auth/login",
+              "host": ["{{base_url_user}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Browse Restaurants & Menu",
+      "item": [
+        {
+          "name": "Get Restaurants List",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.length > 0) {",
+                  "        pm.collectionVariables.set('restaurant_id', jsonData.data[0]._id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url_product}}/api/restaurants",
+              "host": ["{{base_url_product}}"],
+              "path": ["api", "restaurants"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Restaurant Menu (Dishes)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.length > 0) {",
+                  "        pm.collectionVariables.set('product_id', jsonData.data[0]._id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url_product}}/api/dishes?restaurant_id={{restaurant_id}}",
+              "host": ["{{base_url_product}}"],
+              "path": ["api", "dishes"],
+              "query": [
+                {
+                  "key": "restaurant_id",
+                  "value": "{{restaurant_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Cart Management",
+      "item": [
+        {
+          "name": "Add Item to Cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.items && jsonData.items.length > 0) {",
+                  "        pm.collectionVariables.set('item_id', jsonData.items[0]._id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurant_id\": \"{{restaurant_id}}\",\n  \"productId\": \"{{product_id}}\",\n  \"quantity\": 2,\n  \"notes\": \"Extra cheese\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_order}}/api/orders/cart/items",
+              "host": ["{{base_url_order}}"],
+              "path": ["api", "orders", "cart", "items"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Cart",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url_order}}/api/orders/cart?restaurant_id={{restaurant_id}}",
+              "host": ["{{base_url_order}}"],
+              "path": ["api", "orders", "cart"],
+              "query": [
+                {
+                  "key": "restaurant_id",
+                  "value": "{{restaurant_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Cart Item",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurant_id\": \"{{restaurant_id}}\",\n  \"quantity\": 3,\n  \"notes\": \"Extra cheese and mushrooms\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_order}}/api/orders/cart/items/{{item_id}}",
+              "host": ["{{base_url_order}}"],
+              "path": ["api", "orders", "cart", "items", "{{item_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Cart Item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url_order}}/api/orders/cart/items/{{item_id}}?restaurant_id={{restaurant_id}}",
+              "host": ["{{base_url_order}}"],
+              "path": ["api", "orders", "cart", "items", "{{item_id}}"],
+              "query": [
+                {
+                  "key": "restaurant_id",
+                  "value": "{{restaurant_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Clear Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurant_id\": \"{{restaurant_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_order}}/api/orders/cart",
+              "host": ["{{base_url_order}}"],
+              "path": ["api", "orders", "cart"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Place Order & Payment",
+      "item": [
+        {
+          "name": "Place Order - VNPAY",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.order) {",
+                  "        pm.collectionVariables.set('order_id', jsonData.order._id);",
+                  "    }",
+                  "    if (jsonData.paymentUrl) {",
+                  "        console.log('Payment URL:', jsonData.paymentUrl);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurant_id\": \"{{restaurant_id}}\",\n  \"long_address\": \"123 Nguyen Trai, District 1, Ho Chi Minh City\",\n  \"payment_method\": \"vnpay\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_order}}/api/orders/place",
+              "host": ["{{base_url_order}}"],
+              "path": ["api", "orders", "place"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Place Order - COD",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.order) {",
+                  "        pm.collectionVariables.set('order_id', jsonData.order._id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurant_id\": \"{{restaurant_id}}\",\n  \"long_address\": \"123 Nguyen Trai, District 1, Ho Chi Minh City\",\n  \"payment_method\": \"cod\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_order}}/api/orders/place",
+              "host": ["{{base_url_order}}"],
+              "path": ["api", "orders", "place"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create VNPAY Payment URL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{order_id}}\",\n  \"amount\": 300000,\n  \"orderInfo\": \"Thanh toan don hang {{order_id}}\",\n  \"returnUrl\": \"http://localhost:5001/order/payment-result\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_payment}}/api/payments/vnpay/create",
+              "host": ["{{base_url_payment}}"],
+              "path": ["api", "payments", "vnpay", "create"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "VNPAY Callback (Simulate Success)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_payment}}/api/payments/vnpay/callback?vnp_Amount=30000000&vnp_ResponseCode=00&vnp_TxnRef={{order_id}}&vnp_TransactionNo=123456789&vnp_SecureHash=test",
+              "host": ["{{base_url_payment}}"],
+              "path": ["api", "payments", "vnpay", "callback"],
+              "query": [
+                {
+                  "key": "vnp_Amount",
+                  "value": "30000000"
+                },
+                {
+                  "key": "vnp_ResponseCode",
+                  "value": "00"
+                },
+                {
+                  "key": "vnp_TxnRef",
+                  "value": "{{order_id}}"
+                },
+                {
+                  "key": "vnp_TransactionNo",
+                  "value": "123456789"
+                },
+                {
+                  "key": "vnp_SecureHash",
+                  "value": "test"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Order Management",
+      "item": [
+        {
+          "name": "Get Order Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url_order}}/api/orders/{{order_id}}/status",
+              "host": ["{{base_url_order}}"],
+              "path": ["api", "orders", "{{order_id}}", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Order Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url_order}}/api/orders/{{order_id}}",
+              "host": ["{{base_url_order}}"],
+              "path": ["api", "orders", "{{order_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cancellation_reason\": \"Changed my mind\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_order}}/api/orders/{{order_id}}/cancel",
+              "host": ["{{base_url_order}}"],
+              "path": ["api", "orders", "{{order_id}}", "cancel"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url_order}}/api/orders?page=1&limit=20",
+              "host": ["{{base_url_order}}"],
+              "path": ["api", "orders"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "confirmed,preparing,delivering",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Payment Service (Direct)",
+      "item": [
+        {
+          "name": "Update Payment Status (Internal)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payment_status\": \"paid\",\n  \"transaction_id\": \"VNP123456789\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_order}}/api/orders/{{order_id}}/payment-status",
+              "host": ["{{base_url_order}}"],
+              "path": ["api", "orders", "{{order_id}}", "payment-status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Query VNPAY Payment Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_payment}}/api/payments/vnpay/query?orderId={{order_id}}&transDate=20240115104000",
+              "host": ["{{base_url_payment}}"],
+              "path": ["api", "payments", "vnpay", "query"],
+              "query": [
+                {
+                  "key": "orderId",
+                  "value": "{{order_id}}"
+                },
+                {
+                  "key": "transDate",
+                  "value": "20240115104000",
+                  "description": "Format: YYYYMMDDHHmmss"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "VNPAY Refund",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{order_id}}\",\n  \"amount\": 300000,\n  \"transactionNo\": \"123456789\",\n  \"transDate\": \"20240115104000\",\n  \"createBy\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url_payment}}/api/payments/vnpay/refund",
+              "host": ["{{base_url_payment}}"],
+              "path": ["api", "payments", "vnpay", "refund"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

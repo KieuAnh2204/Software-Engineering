@@ -15,7 +15,13 @@ router.delete('/cart/items/:itemId', cart.removeItem);
 router.delete('/cart', cart.clearCart);
 router.post('/cart/checkout', cart.checkout);
 
-// history
+// order placement and management
+router.post('/place', order.placeOrder);
+router.post('/:orderId/cancel', order.cancelOrder);
+router.get('/:orderId/status', order.getOrderStatus);
+router.put('/:orderId/payment-status', order.updatePaymentStatus);
+
+// order history
 router.get('/', order.listOrders);
 router.get('/:orderId', order.getOrder);
 

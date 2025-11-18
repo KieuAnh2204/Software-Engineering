@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useCart } from "@/contexts/CartContext";
 import { Link } from "wouter";
 import italianRestaurant from "@assets/generated_images/Italian_restaurant_exterior_b7a0fbc1.png";
 import burgerImage from "@assets/generated_images/Gourmet_burger_meal_380ed3c8.png";
@@ -15,9 +16,14 @@ import sushiImage from "@assets/generated_images/Sushi_platter_c5d624ec.png";
 
 export default function RestaurantDetail() {
   const { isAuthenticated } = useAuth();
+  const { addToCart } = useCart();
   const [selectedItem, setSelectedItem] = useState<{ id: string; name: string } | null>(null);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const { toast } = useToast();
+  
+  // TODO: Get restaurant ID from URL params
+  const restaurantId = "restaurant_id_placeholder";
+  
   const restaurant = {
     name: "Bella Italia",
     image: italianRestaurant,
@@ -72,28 +78,44 @@ export default function RestaurantDetail() {
     },
   ];
 
-  const handleAddToCartClick = (itemId: string, itemName: string) => {
+  const handleAddToCartClick = async (itemId: string, itemName: string) => {
     if (!isAuthenticated) {
       setSelectedItem({ id: itemId, name: itemName });
       setShowLoginDialog(true);
       return;
     }
     
-    toast({
-      title: "Added to cart",
-      description: `${itemName} has been added to your cart.`,
-    });
-    console.log(`Added ${itemName} to cart`);
-  };
-
-  const handleLoginSuccess = () => {
-    if (selectedItem) {
+    try {
+      await addToCart(restaurantId, itemId, 1);
       toast({
         title: "Added to cart",
-        description: `${selectedItem.name} has been added to your cart.`,
+        description: `${itemName} has been added to your cart.`,
       });
-      console.log(`Added ${selectedItem.name} to cart`);
-      setSelectedItem(null);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to add to cart",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleLoginSuccess = async () => {
+    if (selectedItem) {
+      try {
+        await addToCart(restaurantId, selectedItem.id, 1);
+        toast({
+          title: "Added to cart",
+          description: `${selectedItem.name} has been added to your cart.`,
+        });
+        setSelectedItem(null);
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: error.response?.data?.message || "Failed to add to cart",
+          variant: "destructive",
+        });
+      }
     }
   };
 
