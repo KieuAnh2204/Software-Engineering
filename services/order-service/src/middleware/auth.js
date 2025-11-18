@@ -9,13 +9,17 @@ exports.authenticate = (req, res, next) => {
     }
 
     const publicKey = process.env.JWT_PUBLIC_KEY;
-    if (!publicKey) {
+    const secret = process.env.JWT_SECRET;
+
+    if (!publicKey && !secret) {
       return res
         .status(500)
-        .json({ message: 'JWT_PUBLIC_KEY is not configured' });
+        .json({ message: 'JWT configuration is not set' });
     }
 
-    const payload = jwt.verify(token, publicKey, { algorithms: ['RS256'] });
+    const payload = publicKey
+      ? jwt.verify(token, publicKey, { algorithms: ['RS256'] })
+      : jwt.verify(token, secret); // defaults to HS256
 
     const userId = payload.sub || payload.userId || payload.id;
     if (!userId) {
@@ -24,10 +28,12 @@ exports.authenticate = (req, res, next) => {
         .json({ message: 'Invalid token payload' });
     }
 
-    req.user = { id: String(userId) };
+    req.user = {
+      id: String(userId),
+      role: payload.role,
+    };
     next();
   } catch (e) {
     return res.status(401).json({ message: 'Unauthorized' });
   }
 };
-

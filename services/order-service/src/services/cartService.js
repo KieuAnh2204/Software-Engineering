@@ -90,7 +90,12 @@ async function updateCartItem({
   quantity,
   notes,
 }) {
-  const cart = await getOrCreateCart(customer_id, restaurant_id);
+  const cart = await Order.findOne({
+    customer_id,
+    restaurant_id,
+    status: 'cart',
+  });
+  if (!cart) throw new Error('Cart not found');
   const item = cart.items.id(itemId);
   if (!item) throw new Error('Item not found');
 
@@ -107,7 +112,12 @@ async function updateCartItem({
 }
 
 async function removeCartItem({ customer_id, restaurant_id, itemId }) {
-  const cart = await getOrCreateCart(customer_id, restaurant_id);
+  const cart = await Order.findOne({
+    customer_id,
+    restaurant_id,
+    status: 'cart',
+  });
+  if (!cart) throw new Error('Cart not found');
   const item = cart.items.id(itemId);
   if (!item) throw new Error('Item not found');
   item.deleteOne();
