@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,96 +22,214 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Dish } from "@shared/schema";
+import { getDishes, createDish, updateDish, deleteDish } from "@/api/ownerApi";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+interface DishData {
+  _id?: string;
+  restaurant_id: string;
+  name: string;
+  description: string;
+  price: number;
+  image_url: string;
+  is_available: boolean;
+  category?: string;
+  imageFile?: File; // For file upload
+}
 
 export default function OwnerMenuManagement() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingDish, setEditingDish] = useState<Dish | null>(null);
-  const [formData, setFormData] = useState({
+  const [editingDish, setEditingDish] = useState<DishData | null>(null);
+  const [dishes, setDishes] = useState<DishData[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState<DishData>({
+    restaurant_id: "691938ab48990eb197f96549", // ID nhà hàng từ MongoDB
     name: "",
     description: "",
-    price: "",
-    category: "",
+    price: 0,
+    image_url: "",
+    is_available: true,
   });
 
-  const { data: dishes = [], isLoading } = useQuery<Dish[]>({
-    queryKey: ["/api/owner/dishes"],
-  });
+  // Load dishes khi component mount
+  useEffect(() => {
+    loadDishes();
+  }, []);
 
-  const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/owner/dishes", "POST", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/owner/dishes"] });
-      toast({ title: "Dish created successfully" });
-      resetForm();
-    },
-    onError: () => {
-      toast({ title: "Failed to create dish", variant: "destructive" });
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
-      apiRequest(`/api/owner/dishes/${id}`, "PATCH", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/owner/dishes"] });
-      toast({ title: "Dish updated successfully" });
-      resetForm();
-    },
-    onError: () => {
-      toast({ title: "Failed to update dish", variant: "destructive" });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest(`/api/owner/dishes/${id}`, "DELETE"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/owner/dishes"] });
-      toast({ title: "Dish deleted successfully" });
-    },
-    onError: () => {
-      toast({ title: "Failed to delete dish", variant: "destructive" });
-    },
-  });
-
-  const toggleAvailabilityMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiRequest(`/api/owner/dishes/${id}/toggle-availability`, "PATCH"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/owner/dishes"] });
-      toast({ title: "Availability updated" });
-    },
-    onError: () => {
-      toast({ title: "Failed to update availability", variant: "destructive" });
-    },
-  });
+  const loadDishes = async () => {
+    try {
+      setLoading(true);
+      const response = await getDishes(formData.restaurant_id);
+      setDishes(response.data.data || []);
+    } catch (error: any) {
+      console.error("Load dishes error:", error);
+      toast({
+        title: "Lỗi tải danh sách món ăn",
+        description: error.response?.data?.message || "Vui lòng thử lại",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const resetForm = () => {
-    setFormData({ name: "", description: "", price: "", category: "" });
+    setFormData({
+      restaurant_id: "691938ab48990eb197f96549",
+      name: "",
+      description: "",
+      price: 0,
+      image_url: "",
+      is_available: true,
+    });
     setEditingDish(null);
     setIsDialogOpen(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingDish) {
-      updateMutation.mutate({ id: editingDish.id, data: formData });
-    } else {
-      createMutation.mutate(formData);
+    
+    // Validate form
+    if (!formData.name.trim()) {
+      toast({ title: "Vui lòng nhập tên món ăn", variant: "destructive" });
+      return;
+    }
+    
+    if (formData.price <= 0) {
+      toast({ title: "Giá món ăn phải lớn hơn 0", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const dishData = {
+        restaurant_id: formData.restaurant_id,
+        name: formData.name,
+        description: formData.description,
+        price: formData.price,
+        image_url: formData.image_url || undefined,
+        is_available: formData.is_available,
+      };
+      
+      if (editingDish) {
+        // Update existing dish
+        await updateDish(editingDish._id!, dishData);
+        
+        toast({
+          title: "Cập nhật thành công",
+          description: "Món ăn đã được cập nhật",
+        });
+      } else {
+        // Create new dish
+        const response = await createDish(dishData);
+        
+        if (response.data.success) {
+          toast({
+            title: "Tạo món ăn thành công",
+            description: `Đã thêm món "${formData.name}"`,
+          });
+        }
+      }
+      
+      resetForm();
+      await loadDishes(); // Reload dishes
+    } catch (error: any) {
+      console.error("Submit error:", error);
+      console.error("Error response:", error.response);
+      console.error("Error data:", error.response?.data);
+      
+      // Kiểm tra lỗi trùng lặp
+      if (error.response?.status === 409 || error.response?.data?.duplicate) {
+        toast({
+          title: "Món ăn đã tồn tại",
+          description: "Món ăn này đã có trong menu nhà hàng",
+          variant: "destructive",
+        });
+      } else if (error.response?.status === 401) {
+        toast({
+          title: "Lỗi xác thực",
+          description: "Token hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại",
+          variant: "destructive",
+        });
+      } else if (error.response?.status === 403) {
+        toast({
+          title: "Không có quyền",
+          description: error.response?.data?.message || "Bạn không có quyền thêm món ăn cho nhà hàng này",
+          variant: "destructive",
+        });
+      } else if (error.response?.status === 404) {
+        toast({
+          title: "Không tìm thấy nhà hàng",
+          description: "Restaurant ID không tồn tại. Vui lòng kiểm tra lại",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Lỗi",
+          description: error.response?.data?.message || error.message || "Vui lòng thử lại",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleEdit = (dish: Dish) => {
+  const handleEdit = (dish: DishData) => {
     setEditingDish(dish);
     setFormData({
+      restaurant_id: dish.restaurant_id,
       name: dish.name,
       description: dish.description,
       price: dish.price,
-      category: dish.category,
+      image_url: dish.image_url || "",
+      is_available: dish.is_available,
     });
     setIsDialogOpen(true);
+  };
+
+  const handleDelete = async (dishId: string) => {
+    if (!confirm("Bạn có chắc muốn xóa món ăn này?")) return;
+
+    try {
+      setLoading(true);
+      await deleteDish(dishId);
+      toast({ title: "Đã xóa món ăn" });
+      await loadDishes();
+    } catch (error: any) {
+      toast({
+        title: "Lỗi xóa món ăn",
+        description: error.response?.data?.message || "Vui lòng thử lại",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleAvailability = async (dish: DishData) => {
+    try {
+      setLoading(true);
+      await updateDish(dish._id!, { is_available: !dish.is_available });
+      toast({ title: "Đã cập nhật trạng thái" });
+      await loadDishes();
+    } catch (error: any) {
+      toast({
+        title: "Lỗi cập nhật trạng thái",
+        description: error.response?.data?.message || "Vui lòng thử lại",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -126,7 +243,7 @@ export default function OwnerMenuManagement() {
               Add Dish
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingDish ? "Edit Dish" : "Add New Dish"}
@@ -134,17 +251,21 @@ export default function OwnerMenuManagement() {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">
+                  Name <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
+                  placeholder="Tên món ăn (VD: Bún bò Huế)"
                   required
                   data-testid="input-dish-name"
                 />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
                 <Textarea
@@ -153,38 +274,94 @@ export default function OwnerMenuManagement() {
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  required
+                  placeholder="Mô tả món ăn"
+                  rows={3}
                   data-testid="input-dish-description"
                 />
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="price">Price</Label>
+                <Label htmlFor="price">
+                  Price (VND) <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="price"
                   type="number"
-                  step="0.01"
+                  min="0"
+                  step="1000"
                   value={formData.price}
                   onChange={(e) =>
-                    setFormData({ ...formData, price: e.target.value })
+                    setFormData({ ...formData, price: Number(e.target.value) })
                   }
+                  placeholder="Giá (VD: 55000)"
                   required
                   data-testid="input-dish-price"
                 />
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
+                <Label htmlFor="image_url">Image URL</Label>
                 <Input
-                  id="category"
-                  value={formData.category}
+                  id="image_url"
+                  type="url"
+                  value={formData.image_url}
                   onChange={(e) =>
-                    setFormData({ ...formData, category: e.target.value })
+                    setFormData({ ...formData, image_url: e.target.value })
                   }
-                  required
-                  data-testid="input-dish-category"
+                  placeholder="https://i.imgur.com/example.jpg"
+                  data-testid="input-dish-image"
                 />
+                <p className="text-xs text-gray-500">
+                  💡 Tip: Upload ảnh lên{" "}
+                  <a
+                    href="https://imgur.com/upload"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 underline"
+                  >
+                    Imgur
+                  </a>
+                  {" "}và paste link vào đây
+                </p>
+                {formData.image_url && (
+                  <div className="mt-2">
+                    <img
+                      src={formData.image_url}
+                      alt="Preview"
+                      className="w-full max-w-xs h-48 object-cover rounded border"
+                      onError={(e) => {
+                        e.currentTarget.src = "https://via.placeholder.com/300x200?text=Invalid+URL";
+                      }}
+                    />
+                  </div>
+                )}
               </div>
-              <Button type="submit" className="w-full" data-testid="button-save-dish">
-                {editingDish ? "Update Dish" : "Create Dish"}
+
+              <div className="space-y-2">
+                <Label htmlFor="is_available">Status</Label>
+                <Select
+                  value={formData.is_available ? "true" : "false"}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, is_available: value === "true" })
+                  }
+                >
+                  <SelectTrigger data-testid="select-dish-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Available</SelectItem>
+                    <SelectItem value="false">Unavailable</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={loading}
+                data-testid="button-save-dish"
+              >
+                {loading ? "Processing..." : editingDish ? "Update Dish" : "Create Dish"}
               </Button>
             </form>
           </DialogContent>
@@ -207,7 +384,7 @@ export default function OwnerMenuManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {loading ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center">
                     Loading...
@@ -221,18 +398,32 @@ export default function OwnerMenuManagement() {
                 </TableRow>
               ) : (
                 dishes.map((dish) => (
-                  <TableRow key={dish.id} data-testid={`row-dish-${dish.id}`}>
-                    <TableCell className="font-medium">{dish.name}</TableCell>
-                    <TableCell>{dish.category}</TableCell>
-                    <TableCell>${dish.price}</TableCell>
+                  <TableRow key={dish._id} data-testid={`row-dish-${dish._id}`}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {dish.image_url && (
+                          <img
+                            src={dish.image_url}
+                            alt={dish.name}
+                            className="w-10 h-10 object-cover rounded"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
+                          />
+                        )}
+                        {dish.name}
+                      </div>
+                    </TableCell>
+                    <TableCell>{dish.category || "N/A"}</TableCell>
+                    <TableCell>{dish.price.toLocaleString()} VND</TableCell>
                     <TableCell>
                       <Badge
-                        variant={dish.isAvailable ? "default" : "secondary"}
+                        variant={dish.is_available ? "default" : "secondary"}
                         className="cursor-pointer"
-                        onClick={() => toggleAvailabilityMutation.mutate(dish.id)}
-                        data-testid={`badge-status-${dish.id}`}
+                        onClick={() => handleToggleAvailability(dish)}
+                        data-testid={`badge-status-${dish._id}`}
                       >
-                        {dish.isAvailable ? "Available" : "Unavailable"}
+                        {dish.is_available ? "Available" : "Unavailable"}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -241,15 +432,15 @@ export default function OwnerMenuManagement() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleEdit(dish)}
-                          data-testid={`button-edit-${dish.id}`}
+                          data-testid={`button-edit-${dish._id}`}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => deleteMutation.mutate(dish.id)}
-                          data-testid={`button-delete-${dish.id}`}
+                          onClick={() => handleDelete(dish._id!)}
+                          data-testid={`button-delete-${dish._id}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

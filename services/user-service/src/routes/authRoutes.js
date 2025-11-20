@@ -15,11 +15,23 @@ import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
+const requireNameOrFullName = (message) =>
+  body('name').custom((value, { req }) => {
+    const candidate = value || req.body.full_name;
+    if (!candidate || !String(candidate).trim()) {
+      throw new Error(message);
+    }
+    if (!value && req.body.full_name) {
+      req.body.name = req.body.full_name;
+    }
+    return true;
+  });
+
 const customerRegisterValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Invalid email'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('username').isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
-  body('full_name').notEmpty().withMessage('Full name is required'),
+  requireNameOrFullName('Full name is required'),
   body('phone').notEmpty().withMessage('Phone number is required'),
   body('address').notEmpty().withMessage('Address is required')
 ];
@@ -28,7 +40,8 @@ const ownerRegisterValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Invalid email'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('username').isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
-  body('name').notEmpty().withMessage('Owner display name is required'),
+  requireNameOrFullName('Owner display name is required'),
+  body('phone').notEmpty().withMessage('Phone number is required'),
   body('logo_url').custom((value) => {
     if (!value || value.trim() === '') return true; // Allow empty
     const urlPattern = /^https?:\/\/.+/;
@@ -45,14 +58,12 @@ const genericRegisterValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Invalid email'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('username').isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
-  body('full_name')
-    .if((value, { req }) => req.body.role === 'customer')
-    .notEmpty()
-    .withMessage('Full name is required for customers'),
+  requireNameOrFullName('Name is required')
+    .if((value, { req }) => ['customer', 'owner'].includes(req.body.role)),
   body('phone')
-    .if((value, { req }) => req.body.role === 'customer')
+    .if((value, { req }) => ['customer', 'owner'].includes(req.body.role))
     .notEmpty()
-    .withMessage('Phone number is required for customers'),
+    .withMessage('Phone number is required'),
   body('address')
     .if((value, { req }) => req.body.role === 'customer')
     .notEmpty()
@@ -62,7 +73,7 @@ const genericRegisterValidation = [
     .notEmpty()
     .withMessage('Owner display name is required for owners'),
   body('logo_url')
-    .optional()
+    .if((value, { req }) => req.body.role === 'owner' && value)
     .isURL()
     .withMessage('Logo URL must be valid when provided')
 ];

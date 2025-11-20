@@ -1,10 +1,23 @@
 import { validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
-import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Customer from '../models/Customer.js';
 import RestaurantOwner from '../models/RestaurantOwner.js';
-import Admin from '../models/Admin.js';
+
+const normalizeNameInput = (payload = {}, fallback = 'User') => {
+  const {
+    name,
+    full_name,
+    display_name,
+    username
+  } = payload;
+
+  return (name && name.trim()) ||
+    (full_name && full_name.trim()) ||
+    (display_name && display_name.trim()) ||
+    (username && username.trim()) ||
+    fallback;
+};
 
 const generateToken = (user) =>
   jwt.sign(
@@ -23,12 +36,22 @@ const sanitizeUser = (userDoc) => {
     Ensure Customer Profile
    ====================================================== */
 const ensureCustomerProfile = async ({ userId, profile = {} }) => {
-  let existing = await Customer.findOne({ user: userId });
+  const existing = await Customer.findOne({ user: userId });
   if (existing) return existing;
+
+  const fullName = normalizeNameInput(
+    {
+      name: profile.name,
+      full_name: profile.full_name,
+      display_name: profile.display_name,
+      username: profile.username
+    },
+    'Customer'
+  );
 
   return Customer.create({
     user: userId,
-    full_name: profile.full_name || '',
+    full_name: fullName,
     phone: profile.phone || '',
     address: profile.address || ''
   });
@@ -38,12 +61,22 @@ const ensureCustomerProfile = async ({ userId, profile = {} }) => {
     Ensure Owner Profile
    ====================================================== */
 const ensureOwnerProfile = async ({ userId, profile = {} }) => {
-  let existing = await RestaurantOwner.findOne({ user: userId });
+  const existing = await RestaurantOwner.findOne({ user: userId });
   if (existing) return existing;
+
+  const displayName = normalizeNameInput(
+    {
+      name: profile.name,
+      full_name: profile.full_name,
+      display_name: profile.display_name,
+      username: profile.username
+    },
+    'Owner'
+  );
 
   return RestaurantOwner.create({
     user: userId,
-    display_name: profile.name || '',
+    display_name: displayName,
     logo_url: profile.logo_url || null,
     phone: profile.phone || '',
     address: profile.address || ''
@@ -72,10 +105,10 @@ const handleUniqueCredentialCheck = async (email, username) => {
 /* ======================================================
     Create Customer (User + Profile)
    ====================================================== */
-const createCustomerAccount = async ({ email, password, username, full_name, phone, address }) => {
+const createCustomerAccount = async ({ email, password, username, name, full_name, phone, address }) => {
   await handleUniqueCredentialCheck(email, username);
 
-  // Tạo user trước
+  // Create base user first
   const user = await User.create({
     email,
     password,
@@ -83,18 +116,19 @@ const createCustomerAccount = async ({ email, password, username, full_name, pho
     role: 'customer'
   });
 
-  // Tạo customer profile, nếu lỗi thì xóa user
+  // Create customer profile, and clean up user if it fails
   try {
+    const normalizedName = normalizeNameInput({ name, full_name, username }, username);
     const customer = await Customer.create({
       user: user._id,
-      full_name,
-      phone,
+      full_name: normalizedName,
+      phone: phone || '',
       address: address || ''
     });
 
     return { user, customer };
   } catch (err) {
-    // Cleanup user nếu tạo customer thất bại
+    // Cleanup user if creating customer fails
     try {
       await User.findByIdAndDelete(user._id);
     } catch (cleanupErr) {
@@ -107,10 +141,10 @@ const createCustomerAccount = async ({ email, password, username, full_name, pho
 /* ======================================================
     Create Owner (User + Profile)
    ====================================================== */
-const createOwnerAccount = async ({ email, password, username, name, logo_url, phone, address }) => {
+const createOwnerAccount = async ({ email, password, username, name, full_name, logo_url, phone, address }) => {
   await handleUniqueCredentialCheck(email, username);
 
-  // Tạo user trước
+  // Create base user first
   const user = await User.create({
     email,
     password,
@@ -118,11 +152,12 @@ const createOwnerAccount = async ({ email, password, username, name, logo_url, p
     role: 'owner'
   });
 
-  // Tạo owner profile, nếu lỗi thì xóa user
+  // Create owner profile, and clean up user if it fails
   try {
+    const displayName = normalizeNameInput({ name, full_name, username }, username);
     const owner = await RestaurantOwner.create({
       user: user._id,
-      display_name: name || username,
+      display_name: displayName,
       logo_url: logo_url || null,
       phone: phone || '',
       address: address || ''
@@ -130,7 +165,7 @@ const createOwnerAccount = async ({ email, password, username, name, logo_url, p
 
     return { user, owner };
   } catch (err) {
-    // Cleanup user nếu tạo owner thất bại
+    // Cleanup user if creating owner fails
     try {
       await User.findByIdAndDelete(user._id);
     } catch (cleanupErr) {
@@ -143,18 +178,27 @@ const createOwnerAccount = async ({ email, password, username, name, logo_url, p
 const respondWithAuthPayload = (res, user, profileKey, profileValue, message, status = 201) => {
   const token = generateToken(user);
   
-  // Merge user và profile thành một object
+  // Merge user and profile into one object
   const userObj = sanitizeUser(user);
-  const profileObj = profileValue.toObject ? profileValue.toObject() : profileValue;
+  const profileObj = profileValue?.toObject ? profileValue.toObject() : (profileValue || {});
+
+  const responseFullName = normalizeNameInput(
+    {
+      full_name: profileObj.full_name,
+      display_name: profileObj.display_name,
+      username: userObj.username
+    },
+    userObj.username
+  );
   
-  // Tạo response user object với đầy đủ thông tin
+  // Build response payload
   const responseUser = {
     _id: userObj._id,
     email: userObj.email,
     username: userObj.username,
-    full_name: profileObj.full_name || profileObj.display_name || userObj.username,
-    phone: profileObj.phone || null,
-    address: profileObj.address || null,
+    full_name: responseFullName,
+    phone: profileObj.phone ?? null,
+    address: profileObj.address ?? null,
     role: userObj.role,
     created_at: userObj.createdAt,
     updated_at: userObj.updatedAt
@@ -177,7 +221,12 @@ export const registerCustomer = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { user, customer } = await createCustomerAccount(req.body);
+    const normalizedBody = {
+      ...req.body,
+      name: req.body.name || req.body.full_name
+    };
+
+    const { user, customer } = await createCustomerAccount(normalizedBody);
 
     respondWithAuthPayload(res, user, 'customer', customer, 'Customer registered successfully');
   } catch (error) {
@@ -193,7 +242,12 @@ export const registerRestaurantOwner = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { user, owner } = await createOwnerAccount(req.body);
+    const normalizedBody = {
+      ...req.body,
+      name: req.body.name || req.body.full_name
+    };
+
+    const { user, owner } = await createOwnerAccount(normalizedBody);
     respondWithAuthPayload(res, user, 'owner', owner, 'Restaurant owner registered successfully');
   } catch (error) {
     next(error);
@@ -244,7 +298,10 @@ export const loginCustomer = async (req, res, next) => {
 
     await User.findByIdAndUpdate(user._id, { lastLogin: new Date() });
 
-    const customer = await ensureCustomerProfile({ userId: user._id });
+    const customer = await ensureCustomerProfile({
+      userId: user._id,
+      profile: { username: user.username }
+    });
 
     respondWithAuthPayload(res, user, 'customer', customer, 'Login successful', 200);
   } catch (error) {
@@ -270,7 +327,10 @@ export const loginRestaurantOwner = async (req, res, next) => {
 
     await User.findByIdAndUpdate(user._id, { lastLogin: new Date() });
 
-    const owner = await ensureOwnerProfile({ userId: user._id });
+    const owner = await ensureOwnerProfile({
+      userId: user._id,
+      profile: { username: user.username }
+    });
 
     respondWithAuthPayload(res, user, 'owner', owner, 'Login successful', 200);
   } catch (error) {

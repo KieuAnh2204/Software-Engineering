@@ -22,7 +22,8 @@ const productClient = axios.create({
 // Add token interceptor for authenticated requests
 const addAuthInterceptor = (client: any) => {
   client.interceptors.request.use((config: any) => {
-    const token = localStorage.getItem("owner_token");
+    // Try owner_token first, then fall back to regular token
+    const token = localStorage.getItem("owner_token") || localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -72,4 +73,30 @@ export const getOwnerRestaurants = (ownerId: string) =>
   productClient.get(`/restaurants?owner_id=${ownerId}`);
 
 export const getOwnerProfile = () => userClient.get("/owners/me");
+
+// =============================================
+// DISH MANAGEMENT APIs
+// =============================================
+export const getDishes = (restaurantId: string) =>
+  productClient.get(`/dishes?restaurant_id=${restaurantId}`);
+
+export const createDish = (data: {
+  restaurant_id: string;
+  name: string;
+  description?: string;
+  price: number;
+  image_url?: string;
+  is_available?: boolean;
+}) => productClient.post("/dishes", data);
+
+export const updateDish = (dishId: string, data: {
+  name?: string;
+  description?: string;
+  price?: number;
+  image_url?: string;
+  is_available?: boolean;
+}) => productClient.put(`/dishes/${dishId}`, data);
+
+export const deleteDish = (dishId: string) =>
+  productClient.delete(`/dishes/${dishId}`);
 
