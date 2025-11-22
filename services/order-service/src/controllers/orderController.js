@@ -1,21 +1,46 @@
 const Order = require('../models/Order');
 
+const ORDER_STATUSES = [
+  'cart',
+  'submitted',
+  'payment_pending',
+  'payment_failed',
+  'confirmed',
+  'preparing',
+  'ready_for_pickup',
+  'delivering',
+  'completed',
+  'cancelled',
+  'expired',
+];
+
 exports.listOrders = async (req, res, next) => {
   try {
     const customer_id = req.user.id;
     const { status, page = 1, limit = 20 } = req.query;
 
     const defaultStatuses = [
+      'submitted',
+      'payment_pending',
+      'confirmed',
+      'preparing',
+      'ready_for_pickup',
+      'delivering',
       'completed',
       'cancelled',
-      'delivering',
-      'preparing',
-      'confirmed',
       'payment_failed',
     ];
-    const statuses = status
+    const statuses = (status
       ? String(status).split(',')
-      : defaultStatuses;
+      : defaultStatuses
+    )
+      .map((s) => s.trim())
+      .filter((s) => ORDER_STATUSES.includes(s));
+    if (statuses.length === 0) {
+      return res
+        .status(400)
+        .json({ message: 'No valid statuses provided' });
+    }
 
     const q = { customer_id, status: { $in: statuses } };
     const pageNum = Number(page) || 1;
@@ -121,10 +146,21 @@ exports.listRestaurantOrders = async (req, res, next) => {
       'preparing',
       'ready_for_pickup',
       'delivering',
+      'completed',
+      'cancelled',
+      'payment_failed',
     ];
-    const statuses = status
+    const statuses = (status
       ? String(status).split(',')
-      : defaultStatuses;
+      : defaultStatuses
+    )
+      .map((s) => s.trim())
+      .filter((s) => ORDER_STATUSES.includes(s));
+    if (statuses.length === 0) {
+      return res
+        .status(400)
+        .json({ message: 'No valid statuses provided' });
+    }
 
     const q = {
       restaurant_id,

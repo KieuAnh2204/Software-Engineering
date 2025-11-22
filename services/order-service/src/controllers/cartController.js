@@ -7,6 +7,9 @@ const {
   clearCart,
   recalcTotal,
 } = require('../services/cartService');
+const { AppError } = require('../utils/appError');
+
+const paymentMethods = ['cod', 'vnpay', 'momo', 'card'];
 
 exports.getCart = async (req, res, next) => {
   try {
@@ -118,6 +121,12 @@ exports.checkout = async (req, res, next) => {
         message: 'restaurant_id and payment_method are required',
       });
     }
+    if (!paymentMethods.includes(payment_method)) {
+      throw AppError.badRequest('payment_method is invalid');
+    }
+    if (long_address !== undefined && typeof long_address !== 'string') {
+      throw AppError.badRequest('long_address must be a string');
+    }
 
     const order = await Order.findOne({
       customer_id,
@@ -126,6 +135,12 @@ exports.checkout = async (req, res, next) => {
     });
     if (!order || order.items.length === 0) {
       return res.status(400).json({ message: 'Cart is empty' });
+    }
+    if (order.expires_at && order.expires_at < new Date()) {
+      order.status = 'expired';
+      order.updated_at = new Date();
+      await order.save();
+      throw AppError.badRequest('Cart expired, please start a new cart');
     }
 
     recalcTotal(order);

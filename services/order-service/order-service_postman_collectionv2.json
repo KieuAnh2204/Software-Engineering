@@ -2,20 +2,41 @@
   "info": {
     "name": "Order Service - Cart & Orders v2",
     "_postman_id": "8b3d7b56-87f5-4f0e-9a45-66b2a4a6f1c9",
-    "description": "Postman collection to test the cart → checkout → orders flow for the order-service.",
+    "description": "Postman collection to test cart, checkout, and order flows for the order-service.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://localhost:3002" },
-    { "key": "customer_token", "value": "" },
-    { "key": "owner_token", "value": "" },
-    { "key": "restaurant_id", "value": "" },
-    { "key": "product_id", "value": "" },
-    { "key": "item_id", "value": "" },
-    { "key": "order_id", "value": "" },
+    {
+      "key": "base_url",
+      "value": "http://localhost:3002"
+    },
+    {
+      "key": "customer_token",
+      "value": ""
+    },
+    {
+      "key": "owner_token",
+      "value": ""
+    },
+    {
+      "key": "restaurant_id",
+      "value": ""
+    },
+    {
+      "key": "product_id",
+      "value": ""
+    },
+    {
+      "key": "item_id",
+      "value": ""
+    },
+    {
+      "key": "order_id",
+      "value": ""
+    },
     {
       "key": "order_statuses",
-      "value": "completed,cancelled,delivering,preparing,confirmed,payment_failed"
+      "value": "submitted,payment_pending,confirmed,preparing,ready_for_pickup,delivering,completed,cancelled,payment_failed"
     }
   ],
   "item": [
@@ -40,10 +61,19 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/orders/cart?restaurant_id={{restaurant_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["api", "orders", "cart"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "cart"
+              ],
               "query": [
-                { "key": "restaurant_id", "value": "{{restaurant_id}}" }
+                {
+                  "key": "restaurant_id",
+                  "value": "{{restaurant_id}}"
+                }
               ]
             },
             "description": "Gets the current cart for the authenticated customer and given restaurant_id. Creates a new empty cart if none exists."
@@ -72,8 +102,15 @@
             },
             "url": {
               "raw": "{{base_url}}/api/orders/cart/items",
-              "host": ["{{base_url}}"],
-              "path": ["api", "orders", "cart", "items"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "cart",
+                "items"
+              ]
             },
             "description": "Adds an item (dish/product) into the customer's cart for a specific restaurant."
           },
@@ -101,8 +138,16 @@
             },
             "url": {
               "raw": "{{base_url}}/api/orders/cart/items/{{item_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["api", "orders", "cart", "items", "{{item_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "cart",
+                "items",
+                "{{item_id}}"
+              ]
             },
             "description": "Updates quantity and/or notes of a cart item. Set quantity <= 0 to remove it."
           },
@@ -130,8 +175,16 @@
             },
             "url": {
               "raw": "{{base_url}}/api/orders/cart/items/{{item_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["api", "orders", "cart", "items", "{{item_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "cart",
+                "items",
+                "{{item_id}}"
+              ]
             },
             "description": "Removes an item from the cart for the given restaurant_id."
           },
@@ -159,8 +212,14 @@
             },
             "url": {
               "raw": "{{base_url}}/api/orders/cart",
-              "host": ["{{base_url}}"],
-              "path": ["api", "orders", "cart"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "cart"
+              ]
             },
             "description": "Marks the current cart as expired for the given restaurant and clears it."
           },
@@ -188,8 +247,15 @@
             },
             "url": {
               "raw": "{{base_url}}/api/orders/cart/checkout",
-              "host": ["{{base_url}}"],
-              "path": ["api", "orders", "cart", "checkout"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "cart",
+                "checkout"
+              ]
             },
             "description": "Submits the current cart as an order and sets payment_method and long_address. For non-COD, the service would later integrate with PAYMENT_SERVICE_URL."
           },
@@ -218,17 +284,32 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/orders?status={{order_statuses}}&page=1&limit=20",
-              "host": ["{{base_url}}"],
-              "path": ["api", "orders"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ],
               "query": [
-                { "key": "status", "value": "{{order_statuses}}" },
-                { "key": "page", "value": "1" },
-                { "key": "limit", "value": "20" }
+                {
+                  "key": "status",
+                  "value": "{{order_statuses}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
               ]
             },
-            "description": "Lists the authenticated customer's orders filtered by status list (CSV). Defaults to completed,cancelled,delivering,preparing,confirmed,payment_failed."
+            "description": "Lists the authenticated customer's orders filtered by status list (CSV). Defaults to submitted,payment_pending,confirmed,preparing,ready_for_pickup,delivering,completed,cancelled,payment_failed."
           },
-          "response": []
+          "response": [],
+          "description": "Lists the authenticated customer's orders filtered by status list (CSV). Defaults to submitted,payment_pending,confirmed,preparing,ready_for_pickup,delivering,completed,cancelled,payment_failed."
         },
         {
           "name": "GET /api/orders/:orderId - Get Order Detail",
@@ -248,8 +329,14 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/orders/{{order_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["api", "orders", "{{order_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{order_id}}"
+              ]
             },
             "description": "Gets full details of a single order for the authenticated customer. Set {{order_id}} from a previous response."
           },
@@ -277,8 +364,15 @@
             },
             "url": {
               "raw": "{{base_url}}/api/orders/{{order_id}}/mock-pay",
-              "host": ["{{base_url}}"],
-              "path": ["api", "orders", "{{order_id}}", "mock-pay"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{order_id}}",
+                "mock-pay"
+              ]
             },
             "description": "Simulates a successful payment for an order (dev only). Marks payment_status='paid' and status='confirmed' when appropriate. Use the order_id from checkout or list orders."
           },
@@ -306,25 +400,40 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/orders/restaurant?restaurant_id={{restaurant_id}}&status=submitted,payment_pending,confirmed,preparing,ready_for_pickup,delivering&page=1&limit=20",
-              "host": ["{{base_url}}"],
-              "path": ["api", "orders", "restaurant"],
+              "raw": "{{base_url}}/api/orders/restaurant?restaurant_id={{restaurant_id}}&status=submitted,payment_pending,confirmed,preparing,ready_for_pickup,delivering,completed,cancelled,payment_failed&page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "restaurant"
+              ],
               "query": [
-                { "key": "restaurant_id", "value": "{{restaurant_id}}" },
+                {
+                  "key": "restaurant_id",
+                  "value": "{{restaurant_id}}"
+                },
                 {
                   "key": "status",
-                  "value": "submitted,payment_pending,confirmed,preparing,ready_for_pickup,delivering"
+                  "value": "submitted,payment_pending,confirmed,preparing,ready_for_pickup,delivering,completed,cancelled,payment_failed"
                 },
-                { "key": "page", "value": "1" },
-                { "key": "limit", "value": "20" }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
               ]
             },
             "description": "Lists orders for a given restaurant_id for restaurant owner/admin. Use an owner token and their restaurant_id."
           },
-          "response": []
+          "response": [],
+          "description": "Lists orders for a given restaurant_id for restaurant owner/admin. Use an owner token and their restaurant_id."
         }
       ]
     }
   ]
 }
-
