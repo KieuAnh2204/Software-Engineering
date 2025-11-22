@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, Clock, Star } from "lucide-react";
 import { Header } from "@/components/Header";
 import { MenuItemCard } from "@/components/MenuItemCard";
@@ -8,75 +8,68 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/contexts/CartContext";
-import { Link } from "wouter";
-import italianRestaurant from "@assets/generated_images/Italian_restaurant_exterior_b7a0fbc1.png";
-import burgerImage from "@assets/generated_images/Gourmet_burger_meal_380ed3c8.png";
-import pizzaImage from "@assets/generated_images/Margherita_pizza_2e01d893.png";
-import sushiImage from "@assets/generated_images/Sushi_platter_c5d624ec.png";
+import { Link, useParams } from "wouter";
+import axios from "axios";
+
+interface Restaurant {
+  _id: string;
+  name: string;
+  description?: string;
+  phone?: string;
+  address?: string;
+  logo_url?: string;
+  is_active?: boolean;
+}
+
+interface Dish {
+  _id: string;
+  name: string;
+  description?: string;
+  price: number;
+  image_url?: string;
+  is_available?: boolean;
+  restaurant_id: string;
+}
 
 export default function RestaurantDetail() {
   const { isAuthenticated } = useAuth();
   const { addToCart } = useCart();
+  const params = useParams();
+  const restaurantId = params.id || "";
   const [selectedItem, setSelectedItem] = useState<{ id: string; name: string } | null>(null);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
+  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [dishes, setDishes] = useState<Dish[]>([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  
-  // TODO: Get restaurant ID from URL params
-  const restaurantId = "restaurant_id_placeholder";
-  
-  const restaurant = {
-    name: "Bella Italia",
-    image: italianRestaurant,
-    cuisine: ["Italian", "Pizza", "Pasta"],
-    rating: 4.8,
-    deliveryTime: "25-35 min",
-    deliveryFee: 2.99,
-  };
 
-  const menuItems = [
-    {
-      id: "1",
-      name: "Classic Burger",
-      description: "Juicy beef patty with fresh lettuce, tomatoes, and special sauce",
-      price: 12.99,
-      image: burgerImage,
-    },
-    {
-      id: "2",
-      name: "Margherita Pizza",
-      description: "Fresh mozzarella, basil, and tomato sauce on wood-fired crust",
-      price: 14.99,
-      image: pizzaImage,
-    },
-    {
-      id: "3",
-      name: "Sushi Platter",
-      description: "Assorted fresh sushi rolls with wasabi and ginger",
-      price: 18.99,
-      image: sushiImage,
-    },
-    {
-      id: "4",
-      name: "Caesar Salad",
-      description: "Crisp romaine, parmesan, croutons, and Caesar dressing",
-      price: 9.99,
-      image: burgerImage,
-    },
-    {
-      id: "5",
-      name: "Pasta Carbonara",
-      description: "Creamy pasta with bacon, eggs, and parmesan cheese",
-      price: 13.99,
-      image: pizzaImage,
-    },
-    {
-      id: "6",
-      name: "Tiramisu",
-      description: "Classic Italian dessert with coffee-soaked ladyfingers",
-      price: 7.99,
-      image: sushiImage,
-    },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // Fetch restaurant details
+        const restaurantRes = await axios.get(`http://localhost:3003/api/restaurants/${restaurantId}`);
+        setRestaurant(restaurantRes.data.data);
+
+        // Fetch dishes for this restaurant
+        const dishesRes = await axios.get(`http://localhost:3003/api/dishes?restaurant_id=${restaurantId}`);
+        setDishes(dishesRes.data.data || []);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load restaurant details",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (restaurantId) {
+      fetchData();
+    }
+  }, [restaurantId, toast]);
 
   const handleAddToCartClick = async (itemId: string, itemName: string) => {
     if (!isAuthenticated) {
@@ -123,64 +116,73 @@ export default function RestaurantDetail() {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <div className="relative h-64 lg:h-80 w-full overflow-hidden">
-        <img
-          src={restaurant.image}
-          alt={restaurant.name}
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-        
-        <Link href="/">
-          <Button
-            variant="secondary"
-            size="icon"
-            className="absolute top-4 left-4"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        </Link>
-      </div>
-
-      <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-3">{restaurant.name}</h1>
-          <div className="flex flex-wrap items-center gap-4 mb-4">
-            <div className="flex items-center gap-1">
-              <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-              <span className="font-medium">{restaurant.rating}</span>
-            </div>
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <Clock className="h-5 w-5" />
-              <span>{restaurant.deliveryTime}</span>
-            </div>
-            <span className="text-muted-foreground">
-              {restaurant.deliveryFee === 0 ? "Free delivery" : `$${restaurant.deliveryFee.toFixed(2)} delivery`}
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {restaurant.cuisine.map((c) => (
-              <Badge key={c} variant="secondary">
-                {c}
-              </Badge>
-            ))}
-          </div>
+      {loading ? (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-lg text-muted-foreground">Loading...</p>
         </div>
-
-        <div>
-          <h2 className="text-2xl font-bold mb-6">Menu</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {menuItems.map((item) => (
-              <MenuItemCard
-                key={item.id}
-                {...item}
-                onAddToCart={() => handleAddToCartClick(item.id, item.name)}
-              />
-            ))}
-          </div>
+      ) : !restaurant ? (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-lg text-muted-foreground">Restaurant not found</p>
         </div>
-      </main>
+      ) : (
+        <>
+          <div className="relative h-64 lg:h-80 w-full overflow-hidden">
+            <img
+              src={restaurant.logo_url || "/attached_assets/no_image.png"}
+              alt={restaurant.name}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+            
+            <Link href="/">
+              <Button
+                variant="secondary"
+                size="icon"
+                className="absolute top-4 left-4"
+                data-testid="button-back"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+          </div>
+
+          <main className="container mx-auto px-4 py-8">
+            <div className="mb-8">
+              <h1 className="text-4xl font-bold mb-3">{restaurant.name}</h1>
+              {restaurant.description && (
+                <p className="text-muted-foreground mb-4">{restaurant.description}</p>
+              )}
+              {restaurant.address && (
+                <p className="text-sm text-muted-foreground mb-2">📍 {restaurant.address}</p>
+              )}
+              {restaurant.phone && (
+                <p className="text-sm text-muted-foreground mb-4">📞 {restaurant.phone}</p>
+              )}
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-bold mb-6">Menu</h2>
+              {dishes.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">No dishes available</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {dishes.map((dish) => (
+                    <MenuItemCard
+                      key={dish._id}
+                      id={dish._id}
+                      name={dish.name}
+                      description={dish.description || ""}
+                      price={dish.price}
+                      image={dish.image_url || "/attached_assets/no_image.png"}
+                      onAddToCart={() => handleAddToCartClick(dish._id, dish.name)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </main>
+        </>
+      )}
 
       <LoginDialog
         open={showLoginDialog}
