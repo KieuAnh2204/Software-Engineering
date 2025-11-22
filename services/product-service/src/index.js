@@ -2,6 +2,7 @@ const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
+const path = require('path');
 const connectDB = require('./config/database');
 const restaurantRoutes = require('./routes/restaurantRoutes');
 const dishRoutes = require('./routes/dishRoutes');
@@ -48,7 +49,16 @@ const sampleDishes = {
 // Middleware
 const app = express();
 
-app.use(helmet());
+// Configure helmet with CORS-friendly settings
+app.use(helmet({
+  crossOriginResourcePolicy: false, // Disable to allow cross-origin images
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      "img-src": ["'self'", "data:", "http:", "https:"],
+    },
+  },
+}));
 
 // Allow requests from frontend - simplified CORS for development
 app.use(cors({
@@ -57,6 +67,8 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+// Serve static files with correct path (absolute path in Docker container)
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // Health check
 app.get('/health', (req, res) => {

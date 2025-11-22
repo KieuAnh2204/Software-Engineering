@@ -90,48 +90,8 @@ export class MemStorage implements IStorage {
       });
     });
 
-    const sampleDishes: Array<Omit<Dish, 'id' | 'createdAt'>> = [
-      {
-        name: "Margherita Pizza",
-        description: "Classic pizza with tomato sauce, mozzarella, and fresh basil",
-        price: "12.99",
-        category: "Pizza",
-        imageUrl: null,
-        isAvailable: true,
-      },
-      {
-        name: "Caesar Salad",
-        description: "Fresh romaine lettuce with Caesar dressing, croutons, and parmesan",
-        price: "8.99",
-        category: "Salads",
-        imageUrl: null,
-        isAvailable: true,
-      },
-      {
-        name: "Chicken Burger",
-        description: "Grilled chicken breast with lettuce, tomato, and special sauce",
-        price: "10.99",
-        category: "Burgers",
-        imageUrl: null,
-        isAvailable: true,
-      },
-      {
-        name: "Spaghetti Carbonara",
-        description: "Classic Italian pasta with bacon, eggs, and parmesan cheese",
-        price: "14.99",
-        category: "Pasta",
-        imageUrl: null,
-        isAvailable: true,
-      },
-      {
-        name: "Fish and Chips",
-        description: "Crispy battered fish with golden fries and tartar sauce",
-        price: "13.99",
-        category: "Seafood",
-        imageUrl: null,
-        isAvailable: false,
-      },
-    ];
+    // Xóa dữ liệu mẫu - sẽ dùng dữ liệu thật từ backend
+    const sampleDishes: Array<Omit<Dish, 'id' | 'createdAt'>> = [];
 
     sampleDishes.forEach(dish => {
       const id = randomUUID();
@@ -142,118 +102,10 @@ export class MemStorage implements IStorage {
       });
     });
 
+    // Xóa dữ liệu orders mẫu - sẽ dùng dữ liệu thật từ backend
     const now = new Date();
     const dishIds = Array.from(this.dishes.keys());
-    const sampleOrders: Array<Omit<Order, 'id' | 'orderedAt' | 'updatedAt'>> = [
-      {
-        dishId: dishIds[0],
-        dishName: "Margherita Pizza",
-        quantity: 2,
-        totalAmount: "25.98",
-        status: "completed",
-        customerName: "John Doe",
-        customerAddress: "123 Main St, City, State 12345",
-      },
-      {
-        dishId: dishIds[1],
-        dishName: "Caesar Salad",
-        quantity: 1,
-        totalAmount: "8.99",
-        status: "completed",
-        customerName: "Jane Smith",
-        customerAddress: "456 Oak Ave, City, State 12345",
-      },
-      {
-        dishId: dishIds[0],
-        dishName: "Margherita Pizza",
-        quantity: 1,
-        totalAmount: "12.99",
-        status: "pending",
-        customerName: "Bob Johnson",
-        customerAddress: "789 Pine Rd, City, State 12345",
-      },
-      {
-        dishId: dishIds[2],
-        dishName: "Chicken Burger",
-        quantity: 3,
-        totalAmount: "32.97",
-        status: "preparing",
-        customerName: "Alice Brown",
-        customerAddress: "321 Elm St, City, State 12345",
-      },
-      {
-        dishId: dishIds[3],
-        dishName: "Spaghetti Carbonara",
-        quantity: 2,
-        totalAmount: "29.98",
-        status: "delivering",
-        customerName: "Charlie Wilson",
-        customerAddress: "654 Maple Dr, City, State 12345",
-      },
-      {
-        dishId: dishIds[0],
-        dishName: "Margherita Pizza",
-        quantity: 1,
-        totalAmount: "12.99",
-        status: "preparing",
-        customerName: "Michael Davis",
-        customerAddress: "987 Birch Ln, City, State 12345",
-      },
-      {
-        dishId: dishIds[3],
-        dishName: "Spaghetti Carbonara",
-        quantity: 1,
-        totalAmount: "14.99",
-        status: "preparing",
-        customerName: "Sarah Martinez",
-        customerAddress: "246 Cedar Ct, City, State 12345",
-      },
-      {
-        dishId: dishIds[1],
-        dishName: "Caesar Salad",
-        quantity: 2,
-        totalAmount: "17.98",
-        status: "preparing",
-        customerName: "David Lee",
-        customerAddress: "135 Spruce Way, City, State 12345",
-      },
-      {
-        dishId: dishIds[2],
-        dishName: "Chicken Burger",
-        quantity: 2,
-        totalAmount: "21.98",
-        status: "preparing",
-        customerName: "Emily Garcia",
-        customerAddress: "864 Willow St, City, State 12345",
-      },
-      {
-        dishId: dishIds[3],
-        dishName: "Spaghetti Carbonara",
-        quantity: 3,
-        totalAmount: "44.97",
-        status: "preparing",
-        customerName: "James Anderson",
-        customerAddress: "753 Ash Rd, City, State 12345",
-      },
-      {
-        dishId: dishIds[0],
-        dishName: "Margherita Pizza",
-        quantity: 2,
-        totalAmount: "25.98",
-        status: "preparing",
-        customerName: "Jennifer Taylor",
-        customerAddress: "951 Poplar Ave, City, State 12345",
-      },
-      {
-        dishId: dishIds[1],
-        dishName: "Caesar Salad",
-        quantity: 3,
-        totalAmount: "26.97",
-        status: "preparing",
-        customerName: "Robert Thomas",
-        customerAddress: "159 Walnut Blvd, City, State 12345",
-      },
-    ];
+    const sampleOrders: Array<Omit<Order, 'id' | 'orderedAt' | 'updatedAt'>> = [];
 
     sampleOrders.forEach((order, index) => {
       const id = randomUUID();

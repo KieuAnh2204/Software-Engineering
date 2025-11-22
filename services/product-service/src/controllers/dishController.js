@@ -1,6 +1,25 @@
 const Dish = require('../models/Dish');
 const Restaurant = require('../models/Restaurant');
 
+const buildImageUrl = (req, filename) => {
+  const baseUrl = (process.env.PRODUCT_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  return `${baseUrl}/uploads/dishes/${filename}`;
+};
+
+exports.uploadImage = (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    const imageUrl = buildImageUrl(req, req.file.filename);
+    return res.status(201).json({ success: true, image_url: imageUrl, filename: req.file.filename });
+  } catch (error) {
+    console.error('Upload image error:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
 exports.createDish = async (req, res) => {
   try {
     const { restaurant_id, name, description, price, image_url, is_available } = req.body;
@@ -30,12 +49,18 @@ exports.createDish = async (req, res) => {
       });
     }
 
+    // Prefer uploaded file over provided image_url
+    let finalImageUrl = image_url || null;
+    if (req.file) {
+      finalImageUrl = buildImageUrl(req, req.file.filename);
+    }
+
     const dish = await Dish.create({
       restaurant_id,
       name: name.trim(),
       description: description || '',
       price,
-      image_url: image_url || null,
+      image_url: finalImageUrl,
       is_available: is_available !== undefined ? is_available : true
     });
 
@@ -89,6 +114,11 @@ exports.updateDish = async (req, res) => {
         dish[field] = req.body[field];
       }
     });
+
+    // If new file uploaded, override image_url
+    if (req.file) {
+      dish.image_url = buildImageUrl(req, req.file.filename);
+    }
 
     await dish.save();
     res.status(200).json({ success: true, message: 'Dish updated', data: dish });
