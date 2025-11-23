@@ -9,6 +9,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { RestaurantOwnerAuthProvider } from "@/contexts/RestaurantOwnerAuthContext";
 import { OwnerAuthProvider } from "@/contexts/OwnerAuthContext";
+import { CartProvider } from "@/contexts/CartContext";
 import { AddressConfirmationDialog } from "@/components/AddressConfirmationDialog";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
@@ -97,16 +98,18 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
-          <AdminAuthProvider>
-            <RestaurantOwnerAuthProvider>
-              <OwnerAuthProvider>
-                <TooltipProvider>
-                  <Toaster />
-                  <AppContent />
-                </TooltipProvider>
-              </OwnerAuthProvider>
-            </RestaurantOwnerAuthProvider>
-          </AdminAuthProvider>
+          <CartProvider>
+            <AdminAuthProvider>
+              <RestaurantOwnerAuthProvider>
+                <OwnerAuthProvider>
+                  <TooltipProvider>
+                    <Toaster />
+                    <AppContent />
+                  </TooltipProvider>
+                </OwnerAuthProvider>
+              </RestaurantOwnerAuthProvider>
+            </AdminAuthProvider>
+          </CartProvider>
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>

@@ -15,7 +15,8 @@ export default function OwnerRegister() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
-  const [name, setName] = useState("");
+  const [full_name, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -25,7 +26,8 @@ export default function OwnerRegister() {
         email,
         password,
         username,
-        name,
+        full_name,
+        phone,
         ...(logoUrl && { logo_url: logoUrl }), // Only include if not empty
       });
       
@@ -114,15 +116,28 @@ export default function OwnerRegister() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="full_name">Full Name</Label>
                 <Input
-                  id="name"
+                  id="full_name"
                   type="text"
-                  placeholder="Trần Văn Chủ"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  placeholder="owner2204"
+                  value={full_name}
+                  onChange={(e) => setFullName(e.target.value)}
                   required
                   data-testid="input-name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="0901234567"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                  data-testid="input-phone"
                 />
               </div>
 
@@ -131,7 +146,7 @@ export default function OwnerRegister() {
                 <Input
                   id="logo_url"
                   type="url"
-                  placeholder="https://example.com/logo.jpg"
+                  placeholder="https://example/logo.png"
                   value={logoUrl}
                   onChange={(e) => setLogoUrl(e.target.value)}
                   data-testid="input-logo-url"

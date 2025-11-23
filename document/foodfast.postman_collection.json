@@ -1,0 +1,395 @@
+{
+  "info": {
+    "_postman_id": "1b4d11af-e7f9-4c8b-9a24-0f58acd972c3",
+    "name": "FoodFast Microservices",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "User Service",
+      "item": [
+        {
+          "name": "Register Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\",\n  \"password\": \"secret123\",\n  \"username\": \"customer1\",\n  \"name\": \"Customer One\",\n  \"phone\": \"0123456789\",\n  \"address\": \"123 Sample St\"\n}"
+            },
+            "url": "{{user_base_url}}/register/customer"
+          }
+        },
+        {
+          "name": "Register Owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@example.com\",\n  \"password\": \"secret123\",\n  \"username\": \"owner1\",\n  \"name\": \"Owner One\",\n  \"phone\": \"0987654321\",\n  \"logo_url\": \"https://example.com/logo.png\"\n}"
+            },
+            "url": "{{user_base_url}}/register/owner"
+          }
+        },
+        {
+          "name": "Login Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data && data.token) { pm.environment.set(\"customerToken\", data.token); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\",\n  \"password\": \"secret123\"\n}"
+            },
+            "url": "{{user_base_url}}/login/customer"
+          }
+        },
+        {
+          "name": "Login Owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data && data.token) { pm.environment.set(\"ownerToken\", data.token); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@example.com\",\n  \"password\": \"secret123\"\n}"
+            },
+            "url": "{{user_base_url}}/login/owner"
+          }
+        },
+        {
+          "name": "Get Customer Me",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{user_base_url}}/customers/me"
+          }
+        },
+        {
+          "name": "Get Owner Me",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{user_base_url}}/owners/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Product Service",
+      "item": [
+        {
+          "name": "Create Restaurant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data && data.data && data.data._id) { pm.environment.set(\"restaurantId\", data.data._id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sample Restaurant\",\n  \"description\": \"Tasty meals\",\n  \"phone\": \"0999888777\",\n  \"address\": \"456 Example Ave\",\n  \"logo_url\": \"https://example.com/logo.png\"\n}"
+            },
+            "url": "{{product_base_url}}/restaurants"
+          }
+        },
+        {
+          "name": "Get Restaurants",
+          "request": {
+            "method": "GET",
+            "url": "{{product_base_url}}/restaurants"
+          }
+        },
+        {
+          "name": "Add Dish",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data && data.data && data.data._id) { pm.environment.set(\"dishId\", data.data._id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurant_id\": \"{{restaurantId}}\",\n  \"name\": \"Sample Dish\",\n  \"description\": \"Great taste\",\n  \"price\": 9.99,\n  \"is_available\": true\n}"
+            },
+            "url": "{{product_base_url}}/dishes"
+          }
+        },
+        {
+          "name": "Get Dishes",
+          "request": {
+            "method": "GET",
+            "url": "{{product_base_url}}/dishes?restaurant_id={{restaurantId}}"
+          }
+        },
+        {
+          "name": "Update Dish",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 10.5,\n  \"is_available\": true\n}"
+            },
+            "url": "{{product_base_url}}/dishes/{{dishId}}"
+          }
+        },
+        {
+          "name": "Delete Dish",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{product_base_url}}/dishes/{{dishId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Order Service",
+      "item": [
+        {
+          "name": "Create Order (Checkout Cart)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "const order = data && (data.order || data.data || data);",
+                  "if (order && order._id) { pm.environment.set(\"orderId\", order._id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurant_id\": \"{{restaurantId}}\",\n  \"payment_method\": \"cod\",\n  \"long_address\": \"789 Checkout Rd\"\n}"
+            },
+            "url": "{{order_base_url}}/cart/checkout"
+          }
+        },
+        {
+          "name": "Get Orders (Customer)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": "{{order_base_url}}"
+          }
+        },
+        {
+          "name": "Get Orders (Owner)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "url": "{{order_base_url}}/restaurant?restaurant_id={{restaurantId}}"
+          }
+        },
+        {
+          "name": "Update Order Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"paid\"\n}"
+            },
+            "url": "{{order_base_url}}/{{orderId}}/status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payment Service",
+      "item": [
+        {
+          "name": "Create Payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data && data.data && data.data._id) { pm.environment.set(\"paymentId\", data.data._id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"userId\": \"replace-with-customer-id\",\n  \"amount\": 100000,\n  \"paymentMethod\": \"credit_card\"\n}"
+            },
+            "url": "{{payment_base_url}}/create-intent"
+          }
+        },
+        {
+          "name": "Get Payment Status",
+          "request": {
+            "method": "GET",
+            "url": "{{payment_base_url}}/{{paymentId}}"
+          }
+        },
+        {
+          "name": "VNPay Webhook (Mock)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"vnp_ResponseCode\": \"00\",\n  \"transactionNo\": \"TEST123\",\n  \"amount\": 100000\n}"
+            },
+            "url": "{{payment_base_url}}/vnpay/webhook"
+          }
+        }
+      ]
+    }
+  ]
+}

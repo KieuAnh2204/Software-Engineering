@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useCallback, useEffect, useState } from "react";
+import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,96 +23,306 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Dish } from "@shared/schema";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+interface DishData {
+  _id?: string;
+  restaurant_id: string;
+  name: string;
+  description: string;
+  price: number;
+  image_url: string;
+  is_available: boolean;
+  category?: string;
+  imageFile?: File;
+}
 
 export default function OwnerMenuManagement() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingDish, setEditingDish] = useState<Dish | null>(null);
-  const [formData, setFormData] = useState({
+  const [editingDish, setEditingDish] = useState<DishData | null>(null);
+  const [dishes, setDishes] = useState<DishData[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
+  const token = localStorage.getItem("token") || "";
+  const restaurantIdFromStorage = localStorage.getItem("restaurant_id") || "";
+  const [restaurantId, setRestaurantId] = useState(restaurantIdFromStorage);
+  const productBaseUrl =
+    import.meta.env.VITE_PRODUCT_BASE_URL || import.meta.env.VITE_PRODUCT_API;
+  const [formData, setFormData] = useState<DishData>({
+    restaurant_id: restaurantIdFromStorage,
     name: "",
     description: "",
-    price: "",
-    category: "",
+    price: 0,
+    image_url: "",
+    is_available: true,
   });
 
-  const { data: dishes = [], isLoading } = useQuery<Dish[]>({
-    queryKey: ["/api/owner/dishes"],
-  });
+  // Auto-create restaurant if not exists
+  const ensureRestaurant = useCallback(async () => {
+    if (restaurantId || restaurantIdFromStorage) return;
 
-  const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/owner/dishes", "POST", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/owner/dishes"] });
-      toast({ title: "Dish created successfully" });
-      resetForm();
-    },
-    onError: () => {
-      toast({ title: "Failed to create dish", variant: "destructive" });
-    },
-  });
+    try {
+      const userStr = localStorage.getItem("user");
+      const user = userStr ? JSON.parse(userStr) : null;
+      const restaurantName = user?.restaurantName || user?.full_name || "My Restaurant";
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
-      apiRequest(`/api/owner/dishes/${id}`, "PATCH", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/owner/dishes"] });
-      toast({ title: "Dish updated successfully" });
-      resetForm();
-    },
-    onError: () => {
-      toast({ title: "Failed to update dish", variant: "destructive" });
-    },
-  });
+      const res = await axios.post(
+        `${productBaseUrl}/restaurants`,
+        {
+          name: restaurantName,
+          address: user?.address || "Address not provided",
+          phone: user?.phone || "",
+          description: `Welcome to ${restaurantName}`,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest(`/api/owner/dishes/${id}`, "DELETE"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/owner/dishes"] });
-      toast({ title: "Dish deleted successfully" });
-    },
-    onError: () => {
-      toast({ title: "Failed to delete dish", variant: "destructive" });
-    },
-  });
+      const newRestaurantId = res.data?.data?._id;
+      if (newRestaurantId) {
+        localStorage.setItem("restaurant_id", newRestaurantId);
+        setRestaurantId(newRestaurantId);
+        setFormData(prev => ({ ...prev, restaurant_id: newRestaurantId }));
+        toast({ title: "Restaurant created successfully" });
+      }
+    } catch (error: any) {
+      console.error("Create restaurant error:", error);
+      toast({
+        title: "Unable to create restaurant",
+        description: error.response?.data?.message || "Please try again",
+        variant: "destructive",
+      });
+    }
+  }, [productBaseUrl, restaurantId, restaurantIdFromStorage, token, toast]);
 
-  const toggleAvailabilityMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiRequest(`/api/owner/dishes/${id}/toggle-availability`, "PATCH"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/owner/dishes"] });
-      toast({ title: "Availability updated" });
-    },
-    onError: () => {
-      toast({ title: "Failed to update availability", variant: "destructive" });
-    },
-  });
+  const loadDishes = useCallback(async () => {
+    const targetRestaurantId = restaurantId || restaurantIdFromStorage;
+    if (!productBaseUrl) return;
+    
+    if (!targetRestaurantId) {
+      setDishes([]);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await axios.get(
+        `${productBaseUrl}/dishes?restaurant_id=${targetRestaurantId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      setDishes(res.data?.data || []);
+    } catch (error) {
+      console.error("Load dishes error:", error);
+      toast({
+        title: "Unable to load dishes",
+        description: "Please check the connection and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [productBaseUrl, restaurantId, restaurantIdFromStorage, token, toast]);
+
+  useEffect(() => {
+    ensureRestaurant().then(() => loadDishes());
+  }, [ensureRestaurant, loadDishes]);
 
   const resetForm = () => {
-    setFormData({ name: "", description: "", price: "", category: "" });
+    setFormData({
+      restaurant_id: restaurantId || restaurantIdFromStorage,
+      name: "",
+      description: "",
+      price: 0,
+      image_url: "",
+      is_available: true,
+      imageFile: undefined,
+    });
+    setPreviewUrl("");
     setEditingDish(null);
     setIsDialogOpen(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingDish) {
-      updateMutation.mutate({ id: editingDish.id, data: formData });
-    } else {
-      createMutation.mutate(formData);
+
+    let targetRestaurantId =
+      restaurantId || restaurantIdFromStorage || formData.restaurant_id;
+
+    if (!productBaseUrl) {
+      toast({ title: "Missing product service URL", variant: "destructive" });
+      return;
+    }
+
+    // Auto-create restaurant if not exists
+    if (!targetRestaurantId) {
+      await ensureRestaurant();
+      targetRestaurantId = localStorage.getItem("restaurant_id") || "";
+      
+      if (!targetRestaurantId) {
+        toast({ title: "Unable to create restaurant. Please try again.", variant: "destructive" });
+        return;
+      }
+    }
+
+    if (!formData.name.trim()) {
+      toast({ title: "Please enter a dish name", variant: "destructive" });
+      return;
+    }
+
+    if (formData.price <= 0) {
+      toast({ title: "Price must be greater than 0", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const dishForm = new FormData();
+      dishForm.append("restaurant_id", targetRestaurantId);
+      dishForm.append("name", formData.name);
+      dishForm.append("description", formData.description);
+      dishForm.append("price", String(formData.price));
+      dishForm.append("is_available", String(formData.is_available));
+      if (formData.imageFile) {
+        dishForm.append("image", formData.imageFile);
+      }
+      if (formData.image_url) {
+        dishForm.append("image_url", formData.image_url);
+      }
+
+      if (editingDish) {
+        await axios.put(
+          `${productBaseUrl}/dishes/${editingDish._id}`,
+          dishForm,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+
+        toast({
+          title: "Dish updated",
+          description: `"${formData.name}" has been updated`,
+        });
+      } else {
+        await axios.post(`${productBaseUrl}/dishes`, dishForm, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        });
+
+        alert("Added successfully");
+      }
+
+      resetForm();
+      loadDishes();
+    } catch (error: any) {
+      console.error("Submit error:", error);
+
+      if (error.response?.status === 409 || error.response?.data?.duplicate) {
+        toast({
+          title: "Dish already exists",
+          description: "This dish is already in the menu",
+          variant: "destructive",
+        });
+      } else if (error.response?.status === 401) {
+        toast({
+          title: "Authentication error",
+          description: "Token is invalid or expired. Please login again.",
+          variant: "destructive",
+        });
+      } else if (error.response?.status === 403) {
+        toast({
+          title: "Permission denied",
+          description: error.response?.data?.message || "You cannot add dishes to this restaurant.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Unable to save dish",
+          description: error.response?.data?.message || "Please try again.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleEdit = (dish: Dish) => {
+  const handleEdit = (dish: DishData) => {
     setEditingDish(dish);
+    setRestaurantId(dish.restaurant_id);
     setFormData({
+      restaurant_id: dish.restaurant_id,
       name: dish.name,
       description: dish.description,
       price: dish.price,
-      category: dish.category,
+      image_url: dish.image_url || "",
+      is_available: dish.is_available,
+      imageFile: undefined,
     });
+    setPreviewUrl(dish.image_url || "");
     setIsDialogOpen(true);
+  };
+
+  const handleDelete = async (dishId: string) => {
+    if (!productBaseUrl) return;
+    if (!confirm("Are you sure you want to delete this dish?")) return;
+
+    try {
+      setLoading(true);
+      await axios.delete(`${productBaseUrl}/dishes/${dishId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast({ title: "Dish deleted" });
+      await loadDishes();
+    } catch (error: any) {
+      toast({
+        title: "Failed to delete dish",
+        description: error.response?.data?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleAvailability = async (dish: DishData) => {
+    if (!productBaseUrl) return;
+
+    try {
+      setLoading(true);
+      await axios.patch(
+        `${productBaseUrl}/dishes/${dish._id}`,
+        { is_available: !dish.is_available },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      toast({ title: "Status updated" });
+      await loadDishes();
+    } catch (error: any) {
+      toast({
+        title: "Failed to update status",
+        description: error.response?.data?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -126,7 +336,7 @@ export default function OwnerMenuManagement() {
               Add Dish
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingDish ? "Edit Dish" : "Add New Dish"}
@@ -134,17 +344,21 @@ export default function OwnerMenuManagement() {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">
+                  Name <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
+                  placeholder="Dish name"
                   required
                   data-testid="input-dish-name"
                 />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
                 <Textarea
@@ -153,38 +367,88 @@ export default function OwnerMenuManagement() {
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  required
+                  placeholder="Dish description"
+                  rows={3}
                   data-testid="input-dish-description"
                 />
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="price">Price</Label>
+                <Label htmlFor="price">
+                  Price (VND) <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="price"
                   type="number"
-                  step="0.01"
+                  min="0"
+                  step="1000"
                   value={formData.price}
                   onChange={(e) =>
-                    setFormData({ ...formData, price: e.target.value })
+                    setFormData({ ...formData, price: Number(e.target.value) })
                   }
+                  placeholder="Price (e.g. 55000)"
                   required
                   data-testid="input-dish-price"
                 />
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
+                <Label htmlFor="image">Image</Label>
                 <Input
-                  id="category"
-                  value={formData.category}
-                  onChange={(e) =>
-                    setFormData({ ...formData, category: e.target.value })
-                  }
-                  required
-                  data-testid="input-dish-category"
+                  id="image"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setFormData({ ...formData, imageFile: file });
+                      setPreviewUrl(URL.createObjectURL(file));
+                    }
+                  }}
+                  data-testid="input-dish-image"
                 />
+                <p className="text-xs text-gray-500">
+                  Leave empty to keep the current image.
+                </p>
+                {(previewUrl || formData.image_url) && (
+                  <div className="mt-2">
+                    <img
+                      src={previewUrl || formData.image_url}
+                      alt="Preview"
+                      className="w-full max-w-xs h-48 object-cover rounded border"
+                      onError={(e) => {
+                        e.currentTarget.src = "https://via.placeholder.com/300x200?text=Invalid+URL";
+                      }}
+                    />
+                  </div>
+                )}
               </div>
-              <Button type="submit" className="w-full" data-testid="button-save-dish">
-                {editingDish ? "Update Dish" : "Create Dish"}
+
+              <div className="space-y-2">
+                <Label htmlFor="is_available">Status</Label>
+                <Select
+                  value={formData.is_available ? "true" : "false"}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, is_available: value === "true" })
+                  }
+                >
+                  <SelectTrigger data-testid="select-dish-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Available</SelectItem>
+                    <SelectItem value="false">Unavailable</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={loading}
+                data-testid="button-save-dish"
+              >
+                {loading ? "Processing..." : editingDish ? "Update Dish" : "Create Dish"}
               </Button>
             </form>
           </DialogContent>
@@ -199,6 +463,7 @@ export default function OwnerMenuManagement() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Image</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Price</TableHead>
@@ -207,32 +472,56 @@ export default function OwnerMenuManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">
+                  <TableCell colSpan={6} className="text-center">
                     Loading...
                   </TableCell>
                 </TableRow>
               ) : dishes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">
+                  <TableCell colSpan={6} className="text-center">
                     No dishes found
                   </TableCell>
                 </TableRow>
               ) : (
                 dishes.map((dish) => (
-                  <TableRow key={dish.id} data-testid={`row-dish-${dish.id}`}>
-                    <TableCell className="font-medium">{dish.name}</TableCell>
-                    <TableCell>{dish.category}</TableCell>
-                    <TableCell>${dish.price}</TableCell>
+                  <TableRow key={dish._id} data-testid={`row-dish-${dish._id}`}>
+                    <TableCell>
+                      {dish.image_url ? (
+                        <img
+                          src={dish.image_url}
+                          alt={dish.name}
+                          loading="lazy"
+                          className="w-16 h-16 object-cover rounded-lg shadow-sm bg-gray-100"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.style.display = 'none';
+                            const fallback = target.nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div 
+                        className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400 text-xs"
+                        style={{ display: dish.image_url ? 'none' : 'flex' }}
+                      >
+                        No Image
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {dish.name}
+                    </TableCell>
+                    <TableCell>{dish.category || "N/A"}</TableCell>
+                    <TableCell>{dish.price.toLocaleString()} VND</TableCell>
                     <TableCell>
                       <Badge
-                        variant={dish.isAvailable ? "default" : "secondary"}
+                        variant={dish.is_available ? "default" : "secondary"}
                         className="cursor-pointer"
-                        onClick={() => toggleAvailabilityMutation.mutate(dish.id)}
-                        data-testid={`badge-status-${dish.id}`}
+                        onClick={() => handleToggleAvailability(dish)}
+                        data-testid={`badge-status-${dish._id}`}
                       >
-                        {dish.isAvailable ? "Available" : "Unavailable"}
+                        {dish.is_available ? "Available" : "Unavailable"}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -241,15 +530,15 @@ export default function OwnerMenuManagement() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleEdit(dish)}
-                          data-testid={`button-edit-${dish.id}`}
+                          data-testid={`button-edit-${dish._id}`}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => deleteMutation.mutate(dish.id)}
-                          data-testid={`button-delete-${dish.id}`}
+                          onClick={() => handleDelete(dish._id!)}
+                          data-testid={`button-delete-${dish._id}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

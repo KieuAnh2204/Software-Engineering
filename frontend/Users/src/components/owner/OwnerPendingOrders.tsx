@@ -1,44 +1,98 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useCallback, useEffect, useState } from "react";
+import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Order } from "@shared/schema";
 import { format } from "date-fns";
+
+type OrderItem = {
+  name?: string;
+  quantity?: number;
+  price?: number;
+};
+
+type Order = {
+  _id?: string;
+  id?: string;
+  status?: string;
+  items?: OrderItem[];
+  customer_name?: string;
+  customerName?: string;
+  long_address?: string;
+  customer_address?: string;
+  customerAddress?: string;
+  total_amount?: number;
+  totalAmount?: number;
+  quantity?: number;
+  orderedAt?: string;
+  created_at?: string;
+};
 
 export default function OwnerPendingOrders() {
   const { toast } = useToast();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const { data: orders = [], isLoading } = useQuery<Order[]>({
-    queryKey: ["/api/owner/orders"],
-  });
+  const token = localStorage.getItem("token") || "";
+  const orderBaseUrl =
+    import.meta.env.VITE_ORDER_BASE_URL || import.meta.env.VITE_ORDER_API;
 
-  const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      apiRequest("PATCH", `/api/owner/orders/${id}/status`, { status }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/owner/orders"] });
-      toast({ title: "Order marked as ready for delivery" });
-    },
-    onError: () => {
+  const fetchOrders = useCallback(async () => {
+    if (!orderBaseUrl) return;
+    try {
+      setLoading(true);
+      const res = await axios.get(
+        `${orderBaseUrl}/orders?status=preparing`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      setOrders(res.data?.data || res.data?.items || []);
+    } catch (err) {
+      console.error("Error loading orders:", err);
+      toast({
+        title: "Error loading orders",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [orderBaseUrl, token, toast]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  const handleMarkReady = async (orderId: string) => {
+    if (!orderBaseUrl) return;
+    try {
+      await axios.patch(
+        `${orderBaseUrl}/orders/${orderId}/status`,
+        { status: "ready" },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      await fetchOrders();
+      toast({ title: "Order marked as ready" });
+    } catch (err) {
+      console.error("Error updating order:", err);
       toast({
         title: "Failed to update order status",
         variant: "destructive",
       });
-    },
-  });
-
-  const pendingOrders = orders.filter(
-    (order) => order.status === "preparing"
-  );
-
-  const handleMarkReady = (orderId: string) => {
-    updateStatusMutation.mutate({ id: orderId, status: "delivering" });
+    }
   };
 
-  if (isLoading) {
+  const pendingOrders =
+    orders.filter((order) => order.status === "preparing") || [];
+  const ordersToRender = pendingOrders.length > 0 ? pendingOrders : orders;
+
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">Loading orders...</p>
@@ -46,7 +100,7 @@ export default function OwnerPendingOrders() {
     );
   }
 
-  if (pendingOrders.length === 0) {
+  if (ordersToRender.length === 0) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16">
@@ -62,57 +116,81 @@ export default function OwnerPendingOrders() {
 
   return (
     <div className="space-y-4">
-      {pendingOrders.map((order) => (
-        <Card key={order.id}>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <CardTitle className="text-lg">{order.dishName}</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Badge variant="default" data-testid={`badge-status-${order.id}`}>
-                    Preparing
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">
-                    {format(new Date(order.orderedAt), "MMM d, h:mm a")}
-                  </span>
+      {ordersToRender.map((order) => {
+        const orderId = order._id || order.id || "";
+        const totalAmount = order.total_amount || order.totalAmount || 0;
+        const customerName = order.customer_name || order.customerName || "N/A";
+        const customerAddress =
+          order.long_address || order.customer_address || order.customerAddress;
+        const orderedTime = order.created_at || order.orderedAt;
+        const quantity =
+          order.quantity ||
+          order.items?.reduce(
+            (sum, item) => sum + (item.quantity || 0),
+            0
+          ) ||
+          0;
+        const dishName =
+          order.items?.map((item) => item.name).filter(Boolean).join(", ") ||
+          "Order";
+
+        return (
+          <Card key={orderId}>
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <CardTitle className="text-lg">{dishName}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant="default"
+                      data-testid={`badge-status-${orderId}`}
+                    >
+                      Preparing
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">
+                      {orderedTime
+                        ? format(new Date(orderedTime), "MMM d, h:mm a")
+                        : "N/A"}
+                    </span>
+                  </div>
                 </div>
+                <Button
+                  onClick={() => handleMarkReady(orderId)}
+                  disabled={loading}
+                  data-testid={`button-ready-${orderId}`}
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Mark Ready
+                </Button>
               </div>
-              <Button
-                onClick={() => handleMarkReady(order.id)}
-                disabled={updateStatusMutation.isPending}
-                data-testid={`button-ready-${order.id}`}
-              >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Mark Ready
-              </Button>
-            </div>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <p className="text-sm font-medium mb-1">Customer Information</p>
                 <p className="text-sm text-muted-foreground">
-                  {order.customerName || "N/A"}
+                  {customerName}
                 </p>
-                {order.customerAddress && (
+                {customerAddress && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    {order.customerAddress}
+                    {customerAddress}
                   </p>
                 )}
               </div>
               <div>
                 <p className="text-sm font-medium mb-1">Order Details</p>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <span>Quantity: {order.quantity}</span>
+                  <span>Quantity: {quantity}</span>
                   <span className="font-medium text-foreground">
-                    Total: ${order.totalAmount}
+                    Total: ${totalAmount}
                   </span>
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
-      ))}
+        );
+      })}
     </div>
   );
 }
