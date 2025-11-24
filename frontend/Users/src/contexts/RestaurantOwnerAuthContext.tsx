@@ -7,6 +7,7 @@ import {
 } from "react";
 import { getOwnerMe, loginOwner, registerOwner } from "@/api/auth";
 import { clearToken, getToken, setToken } from "@/api/client";
+import { jwtDecode } from "jwt-decode";
 
 interface RestaurantOwner {
   id: string;
@@ -40,6 +41,15 @@ export function RestaurantOwnerAuthProvider({ children }: { children: ReactNode 
     }
   }, [owner]);
 
+  const extractOwnerIdFromToken = (token: string): string => {
+    try {
+      const decoded: any = jwtDecode(token);
+      return decoded.owner_id || decoded.id || decoded.userId || decoded._id || "";
+    } catch {
+      return "";
+    }
+  };
+
   const syncOwnerState = (payload: any, fallbackUsername?: string) => {
     const ownerPayload = payload?.owner || payload;
     const userPayload = payload?.user || payload;
@@ -60,7 +70,15 @@ export function RestaurantOwnerAuthProvider({ children }: { children: ReactNode 
   const ownerLogin = async (username: string, password: string) => {
     const response = await loginOwner({ email: username, password });
     if (response.data?.token) {
-      setToken(response.data.token);
+      setToken(response.data.token, { owner: true });
+      localStorage.setItem("owner_token", response.data.token);
+      const ownerId =
+        response.data?.user?.owner_id ||
+        response.data?.owner?._id ||
+        extractOwnerIdFromToken(response.data.token);
+      if (ownerId) {
+        localStorage.setItem("owner_id", ownerId);
+      }
     }
     syncOwnerState(response.data, username);
   };
@@ -68,13 +86,23 @@ export function RestaurantOwnerAuthProvider({ children }: { children: ReactNode 
   const ownerRegister = async (data: Record<string, unknown>) => {
     const response = await registerOwner(data);
     if (response.data?.token) {
-      setToken(response.data.token);
+      setToken(response.data.token, { owner: true });
+      localStorage.setItem("owner_token", response.data.token);
+      const ownerId =
+        response.data?.user?.owner_id ||
+        response.data?.owner?._id ||
+        extractOwnerIdFromToken(response.data.token);
+      if (ownerId) {
+        localStorage.setItem("owner_id", ownerId);
+      }
     }
     syncOwnerState(response.data);
   };
 
   const ownerLogout = () => {
-    clearToken();
+    clearToken({ owner: true });
+    localStorage.removeItem("owner_token");
+    localStorage.removeItem("owner_id");
     setOwner(null);
   };
 

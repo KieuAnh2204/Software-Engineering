@@ -53,6 +53,24 @@ const updateRestaurantValidation = validate([
 ]);
 
 router.get('/', getRestaurants);
+router.get('/owner/me', authenticate, authorize('owner'), async (req, res) => {
+  try {
+    const Restaurant = require('../models/Restaurant');
+    const restaurant = await Restaurant.findOne({ owner_id: req.user.id });
+    
+    if (!restaurant) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No restaurant found for this owner' 
+      });
+    }
+
+    res.json({ success: true, data: restaurant });
+  } catch (error) {
+    console.error('Get owner restaurant error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 router.get('/:id', getRestaurantById);
 
 router.post('/', authenticate, authorize('owner', 'admin'), createRestaurantValidation, createRestaurant);
