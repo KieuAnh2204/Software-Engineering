@@ -11,9 +11,8 @@ const {
 
 const {
   createVNPayPayment,
-  vnpayCallback,
-  queryPaymentStatus,
-  refundTransaction,
+  vnpayReturn,
+  vnpayIpn,
 } = require('../controllers/vnpayController');
 
 // Existing payment routes
@@ -27,8 +26,8 @@ router.get('/user/:userId', getUserPayments);
 
 // VNPAY routes
 router.post('/vnpay/create', createVNPayPayment);
-router.get('/vnpay/callback', vnpayCallback);
-router.get('/vnpay/query', queryPaymentStatus);
-router.post('/vnpay/refund', refundTransaction);
+router.get('/vnpay/return', vnpayReturn);
+router.post('/vnpay/ipn', vnpayIpn);
+router.get('/vnpay/ipn', vnpayIpn); // fallback if VNPAY sends GET
 
 module.exports = router;
