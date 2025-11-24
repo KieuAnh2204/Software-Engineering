@@ -25,6 +25,11 @@ router.get(
   authorize('owner', 'admin'),
   order.listRestaurantOrders
 );
+router.patch(
+  '/:orderId/status',
+  authorize('owner', 'admin'),
+  order.updateRestaurantStatus
+);
 
 // customer history
 router.get('/', order.listOrders);

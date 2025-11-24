@@ -30,6 +30,7 @@ import OwnerHome from "@/pages/OwnerHome";
 import RestaurantRegister from "@/pages/RestaurantRegister";
 import OwnerDashboard from "@/pages/OwnerDashboard";
 import ApiTestPage from "@/pages/ApiTestPage";
+import OrderStatus from "@/pages/OrderStatus";
 
 function Router() {
   return (
@@ -52,6 +53,7 @@ function Router() {
       <Route path="/owner/restaurant/new" component={RestaurantRegister} />
       <Route path="/owner/dashboard" component={OwnerDashboard} />
       <Route path="/test-api" component={ApiTestPage} />
+      <Route path="/order-status/:id" component={OrderStatus} />
       <Route component={NotFound} />
     </Switch>
   );

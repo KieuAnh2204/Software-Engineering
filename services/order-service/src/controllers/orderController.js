@@ -284,3 +284,48 @@ exports.listRestaurantOrders = async (req, res, next) => {
   }
 };
 
+exports.updateRestaurantStatus = async (req, res, next) => {
+  try {
+    const role = req.user.role;
+    if (role !== 'owner' && role !== 'admin') {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    const { orderId } = req.params;
+    const { status, restaurant_id } = req.body;
+    if (!status) {
+      return res.status(400).json({ message: 'status is required' });
+    }
+    const allowedStatuses = [
+      'confirmed',
+      'preparing',
+      'ready_for_pickup',
+      'delivering',
+      'completed',
+      'cancelled',
+    ];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    if (restaurant_id && String(order.restaurant_id) !== String(restaurant_id)) {
+      return res.status(400).json({ message: 'restaurant_id mismatch' });
+    }
+
+    order.status = status;
+    order.updated_at = new Date();
+    await order.save();
+
+    const io = getIO();
+    if (io) {
+      io.to(`customer-${order.customer_id}`).emit('order:update', order);
+      io.to(`restaurant-${order.restaurant_id}`).emit('order:update', order);
+    }
+
+    res.json({ order });
+  } catch (e) {
+    next(e);
+  }
+};
+

@@ -14,6 +14,7 @@ type OrderItem = {
 };
 
 type Order = {
+  payment_status: string;
   _id?: string;
   id?: string;
   status?: string;
@@ -37,14 +38,21 @@ export default function OwnerPendingOrders() {
 
   const token = localStorage.getItem("token") || "";
   const orderBaseUrl =
-    import.meta.env.VITE_ORDER_BASE_URL || import.meta.env.VITE_ORDER_API;
+    import.meta.env.VITE_ORDER_BASE_URL || import.meta.env.VITE_ORDER_API || "http://localhost:3002/api/orders";
+  const restaurantId =
+    localStorage.getItem("restaurant_id") ||
+    localStorage.getItem("owner_restaurant_id") ||
+    "";
+
+  const formatVND = (value?: number) =>
+    `${(value || 0).toLocaleString("vi-VN")} ₫`;
 
   const fetchOrders = useCallback(async () => {
-    if (!orderBaseUrl) return;
+    if (!orderBaseUrl || !restaurantId) return;
     try {
       setLoading(true);
       const res = await axios.get(
-        `${orderBaseUrl}/orders?status=preparing`,
+        `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=confirmed`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -67,18 +75,18 @@ export default function OwnerPendingOrders() {
   }, [fetchOrders]);
 
   const handleMarkReady = async (orderId: string) => {
-    if (!orderBaseUrl) return;
+    if (!orderBaseUrl || !restaurantId) return;
     try {
       await axios.patch(
-        `${orderBaseUrl}/orders/${orderId}/status`,
-        { status: "ready" },
+        `${orderBaseUrl}/${orderId}/status`,
+        { status: "preparing", restaurant_id: restaurantId },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
       await fetchOrders();
-      toast({ title: "Order marked as ready" });
+      toast({ title: "Order moved to preparing" });
     } catch (err) {
       console.error("Error updating order:", err);
       toast({
@@ -89,8 +97,11 @@ export default function OwnerPendingOrders() {
   };
 
   const pendingOrders =
-    orders.filter((order) => order.status === "preparing") || [];
-  const ordersToRender = pendingOrders.length > 0 ? pendingOrders : orders;
+    orders.filter(
+      (order) =>
+        order.status === "confirmed" && order.payment_status === "paid"
+    ) || [];
+  const ordersToRender = pendingOrders;
 
   if (loading) {
     return (
@@ -145,7 +156,7 @@ export default function OwnerPendingOrders() {
                       variant="default"
                       data-testid={`badge-status-${orderId}`}
                     >
-                      Preparing
+                      Confirmed / Paid
                     </Badge>
                     <span className="text-sm text-muted-foreground">
                       {orderedTime
@@ -160,7 +171,7 @@ export default function OwnerPendingOrders() {
                   data-testid={`button-ready-${orderId}`}
                 >
                   <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Mark Ready
+                  Start Preparing
                 </Button>
               </div>
           </CardHeader>
@@ -182,7 +193,7 @@ export default function OwnerPendingOrders() {
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                   <span>Quantity: {quantity}</span>
                   <span className="font-medium text-foreground">
-                    Total: ${totalAmount}
+                    Total: {formatVND(totalAmount)}
                   </span>
                 </div>
               </div>

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useCart, getLastCartRestaurantId } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +27,7 @@ export default function Checkout() {
   const { cart, getCart, isLoading } = useCart();
   const { toast } = useToast();
   const { isAuthenticated, user } = useAuth();
+  const [, setLocation] = useLocation();
 
   const restaurantId = cart?.restaurant_id || getLastCartRestaurantId();
 
@@ -149,25 +150,23 @@ export default function Checkout() {
       const order = orderRes.data?.order || orderRes.data;
       if (!order?._id) throw new Error("Order not created");
 
-      // 2) Create VNPAY payment and redirect
-      const payRes = await axios.post(
-        `${PAYMENT_API}/vnpay/create`,
-        {
-          orderId: order._id,
-          userId: user?.id,
-          amount: total, // VND
-          orderInfo: `Thanh toan don hang ${order._id}`,
-        },
+      // 2) Temporarily mark paid/confirmed without payment-service
+      await axios.post(
+        `${ORDER_API}/${order._id}/mock-pay`,
+        {},
         { headers: getAuthHeader() }
       );
-      const paymentUrl = payRes.data?.paymentUrl;
-      if (!paymentUrl) throw new Error("Payment URL not received");
-      window.location.href = paymentUrl;
+
+      toast({
+        title: "Order placed",
+        description: "Your order has been submitted and marked as paid.",
+      });
+      setLocation(`/order-status/${order._id}`);
     } catch (error: any) {
       console.error("Checkout error", error);
       toast({
-        title: "Payment error",
-        description: error?.response?.data?.message || error.message || "Failed to start payment",
+        title: "Checkout error",
+        description: error?.response?.data?.message || error.message || "Failed to place order",
         variant: "destructive",
       });
     }
