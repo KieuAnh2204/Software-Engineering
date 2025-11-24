@@ -30,10 +30,10 @@ exports.createDish = async (req, res) => {
     const restaurant = await Restaurant.findById(restaurant_id);
     if (!restaurant) return res.status(404).json({ success: false, message: 'Restaurant not found' });
     
-    // Temporarily disable owner check for testing
-    // if (req.user && req.user.role === 'owner' && restaurant.owner_id !== req.user.id) {
-    //   return res.status(403).json({ success: false, message: 'Cannot manage dishes for another owner' });
-    // }
+    // Check owner permission
+    if (req.user && req.user.role === 'owner' && restaurant.owner_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Cannot manage dishes for another owner restaurant' });
+    }
 
     // Kiểm tra món trùng lặp (cùng restaurant_id và name)
     const existingDish = await Dish.findOne({ 

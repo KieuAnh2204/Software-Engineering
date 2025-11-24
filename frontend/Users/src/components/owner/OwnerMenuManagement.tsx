@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { jwtDecode } from "jwt-decode";
 
 interface DishData {
   _id?: string;
@@ -50,13 +51,26 @@ export default function OwnerMenuManagement() {
   const [dishes, setDishes] = useState<DishData[]>([]);
   const [loading, setLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>("");
-  const token = localStorage.getItem("token") || "";
-  const restaurantIdFromStorage = localStorage.getItem("restaurant_id") || "";
-  const [restaurantId, setRestaurantId] = useState(restaurantIdFromStorage);
+  const rawToken =
+    localStorage.getItem("owner_token") ||
+    localStorage.getItem("token") ||
+    "";
+  const extractOwnerIdFromToken = (token: string) => {
+    try {
+      const decoded: any = jwtDecode(token);
+      return decoded.owner_id || decoded.id || decoded.userId || decoded._id || "";
+    } catch {
+      return "";
+    }
+  };
+  const ownerId =
+    localStorage.getItem("owner_id") ||
+    extractOwnerIdFromToken(rawToken);
+  const [restaurantId, setRestaurantId] = useState("");
   const productBaseUrl =
     import.meta.env.VITE_PRODUCT_BASE_URL || import.meta.env.VITE_PRODUCT_API;
   const [formData, setFormData] = useState<DishData>({
-    restaurant_id: restaurantIdFromStorage,
+    restaurant_id: "",
     name: "",
     description: "",
     price: 0,
@@ -64,50 +78,51 @@ export default function OwnerMenuManagement() {
     is_available: true,
   });
 
-  // Auto-create restaurant if not exists
+  // Fetch or create restaurant for this owner
   const ensureRestaurant = useCallback(async () => {
-    if (restaurantId || restaurantIdFromStorage) return;
+    if (!rawToken) {
+      console.log("Missing token");
+      return;
+    }
 
     try {
-      const userStr = localStorage.getItem("user");
-      const user = userStr ? JSON.parse(userStr) : null;
-      const restaurantName = user?.restaurantName || user?.full_name || "My Restaurant";
-
-      const res = await axios.post(
-        `${productBaseUrl}/restaurants`,
+      console.log("Fetching restaurant for current owner");
+      // Get restaurant by owner token - using new /owner/me endpoint
+      const res = await axios.get(
+        `${productBaseUrl}/restaurants/owner/me`,
         {
-          name: restaurantName,
-          address: user?.address || "Address not provided",
-          phone: user?.phone || "",
-          description: `Welcome to ${restaurantName}`,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${rawToken}` },
         }
       );
 
-      const newRestaurantId = res.data?.data?._id;
-      if (newRestaurantId) {
-        localStorage.setItem("restaurant_id", newRestaurantId);
-        setRestaurantId(newRestaurantId);
-        setFormData(prev => ({ ...prev, restaurant_id: newRestaurantId }));
-        toast({ title: "Restaurant created successfully" });
+      console.log("Restaurant fetch response:", res.data);
+
+      if (res.data?.success && res.data.data) {
+        // Owner already has a restaurant
+        const existingRestaurant = res.data.data;
+        console.log("Found existing restaurant:", existingRestaurant);
+        setRestaurantId(existingRestaurant._id);
+        setFormData(prev => ({ ...prev, restaurant_id: existingRestaurant._id }));
+        return;
       }
     } catch (error: any) {
-      console.error("Create restaurant error:", error);
+      // If 404, owner doesn't have restaurant yet - will create on first dish add
+      if (error.response?.status === 404) {
+        console.log("No restaurant found for this owner");
+        return;
+      }
+      
+      console.error("Ensure restaurant error:", error);
       toast({
-        title: "Unable to create restaurant",
+        title: "Unable to load restaurant",
         description: error.response?.data?.message || "Please try again",
         variant: "destructive",
       });
     }
-  }, [productBaseUrl, restaurantId, restaurantIdFromStorage, token, toast]);
+  }, [productBaseUrl, rawToken, toast]);
 
   const loadDishes = useCallback(async () => {
-    const targetRestaurantId = restaurantId || restaurantIdFromStorage;
-    if (!productBaseUrl) return;
-    
-    if (!targetRestaurantId) {
+    if (!productBaseUrl || !restaurantId) {
       setDishes([]);
       return;
     }
@@ -115,9 +130,9 @@ export default function OwnerMenuManagement() {
     try {
       setLoading(true);
       const res = await axios.get(
-        `${productBaseUrl}/dishes?restaurant_id=${targetRestaurantId}`,
+        `${productBaseUrl}/dishes?restaurant_id=${restaurantId}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${rawToken}` },
         }
       );
 
@@ -132,15 +147,25 @@ export default function OwnerMenuManagement() {
     } finally {
       setLoading(false);
     }
-  }, [productBaseUrl, restaurantId, restaurantIdFromStorage, token, toast]);
+  }, [productBaseUrl, restaurantId, rawToken, toast]);
 
   useEffect(() => {
-    ensureRestaurant().then(() => loadDishes());
-  }, [ensureRestaurant, loadDishes]);
+    ensureRestaurant().then(() => {
+      if (restaurantId) {
+        loadDishes();
+      }
+    });
+  }, [ensureRestaurant]);
+
+  useEffect(() => {
+    if (restaurantId) {
+      loadDishes();
+    }
+  }, [restaurantId, loadDishes]);
 
   const resetForm = () => {
     setFormData({
-      restaurant_id: restaurantId || restaurantIdFromStorage,
+      restaurant_id: restaurantId,
       name: "",
       description: "",
       price: 0,
@@ -156,8 +181,7 @@ export default function OwnerMenuManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    let targetRestaurantId =
-      restaurantId || restaurantIdFromStorage || formData.restaurant_id;
+    let targetRestaurantId = restaurantId || formData.restaurant_id;
 
     if (!productBaseUrl) {
       toast({ title: "Missing product service URL", variant: "destructive" });
@@ -167,7 +191,7 @@ export default function OwnerMenuManagement() {
     // Auto-create restaurant if not exists
     if (!targetRestaurantId) {
       await ensureRestaurant();
-      targetRestaurantId = localStorage.getItem("restaurant_id") || "";
+      targetRestaurantId = restaurantId;
       
       if (!targetRestaurantId) {
         toast({ title: "Unable to create restaurant. Please try again.", variant: "destructive" });
@@ -206,7 +230,7 @@ export default function OwnerMenuManagement() {
           dishForm,
           {
             headers: {
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${rawToken}`,
               "Content-Type": "multipart/form-data",
             },
           }
@@ -219,7 +243,7 @@ export default function OwnerMenuManagement() {
       } else {
         await axios.post(`${productBaseUrl}/dishes`, dishForm, {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${rawToken}`,
             "Content-Type": "multipart/form-data",
           },
         });
@@ -285,7 +309,7 @@ export default function OwnerMenuManagement() {
     try {
       setLoading(true);
       await axios.delete(`${productBaseUrl}/dishes/${dishId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${rawToken}` },
       });
       toast({ title: "Dish deleted" });
       await loadDishes();
@@ -309,7 +333,7 @@ export default function OwnerMenuManagement() {
         `${productBaseUrl}/dishes/${dish._id}`,
         { is_available: !dish.is_available },
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${rawToken}` },
         }
       );
       toast({ title: "Status updated" });
