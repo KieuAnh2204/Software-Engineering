@@ -1,27 +1,32 @@
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('cloudinary').v2;
 
-const uploadsRoot = path.resolve(process.cwd(), 'uploads', 'dishes');
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: 'dm0nqs7u8',
+  api_key: '354192211775368',
+  api_secret: 'IoURz5sPGoXT5wzdfF1Bk7CxVk4'
+});
 
-// Ensure upload directory exists before saving files
-if (!fs.existsSync(uploadsRoot)) {
-  fs.mkdirSync(uploadsRoot, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadsRoot);
-  },
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `${unique}${path.extname(file.originalname)}`);
+// Configure multer to use Cloudinary storage
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'foodfast/dishes',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+    transformation: [{ width: 800, height: 800, crop: 'limit' }]
   }
 });
 
-const uploadDishImage = multer({ storage });
+const uploadDishImage = multer({ 
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB max
+  }
+});
 
 module.exports = {
   uploadDishImage,
-  uploadsRoot
+  cloudinary
 };
