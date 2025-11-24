@@ -1,19 +1,19 @@
 const Dish = require('../models/Dish');
 const Restaurant = require('../models/Restaurant');
 
-const buildImageUrl = (req, filename) => {
-  const baseUrl = (process.env.PRODUCT_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
-  return `${baseUrl}/uploads/dishes/${filename}`;
-};
-
 exports.uploadImage = (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
-    const imageUrl = buildImageUrl(req, req.file.filename);
-    return res.status(201).json({ success: true, image_url: imageUrl, filename: req.file.filename });
+    // Cloudinary automatically provides the URL in req.file.path
+    const imageUrl = req.file.path;
+    return res.status(201).json({ 
+      success: true, 
+      image_url: imageUrl,
+      public_id: req.file.filename // Cloudinary public_id for deletion if needed
+    });
   } catch (error) {
     console.error('Upload image error:', error);
     return res.status(500).json({ success: false, message: error.message || 'Server error' });
@@ -52,7 +52,8 @@ exports.createDish = async (req, res) => {
     // Prefer uploaded file over provided image_url
     let finalImageUrl = image_url || null;
     if (req.file) {
-      finalImageUrl = buildImageUrl(req, req.file.filename);
+      // Cloudinary provides the secure URL in req.file.path
+      finalImageUrl = req.file.path;
     }
 
     const dish = await Dish.create({
@@ -117,7 +118,8 @@ exports.updateDish = async (req, res) => {
 
     // If new file uploaded, override image_url
     if (req.file) {
-      dish.image_url = buildImageUrl(req, req.file.filename);
+      // Cloudinary provides the secure URL in req.file.path
+      dish.image_url = req.file.path;
     }
 
     await dish.save();
