@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Clock, Star } from "lucide-react";
+import { ArrowLeft, Clock, ShoppingCart, Star } from "lucide-react";
 import { Header } from "@/components/Header";
 import { MenuItemCard } from "@/components/MenuItemCard";
 import { LoginDialog } from "@/components/LoginDialog";
@@ -33,7 +33,7 @@ interface Dish {
 
 export default function RestaurantDetail() {
   const { isAuthenticated } = useAuth();
-  const { addToCart } = useCart();
+  const { addToCart, getCart, itemCount } = useCart();
   const params = useParams();
   const restaurantId = params.id || "";
   const [selectedItem, setSelectedItem] = useState<{ id: string; name: string } | null>(null);
@@ -70,6 +70,15 @@ export default function RestaurantDetail() {
       fetchData();
     }
   }, [restaurantId, toast]);
+
+  useEffect(() => {
+    if (restaurantId && isAuthenticated) {
+      // Fetch or create cart for this restaurant when the user is logged in
+      getCart(restaurantId).catch((err) => {
+        console.error("Failed to load cart", err);
+      });
+    }
+  }, [restaurantId, isAuthenticated, getCart]);
 
   const handleAddToCartClick = async (itemId: string, itemName: string) => {
     if (!isAuthenticated) {
@@ -189,6 +198,19 @@ export default function RestaurantDetail() {
         onOpenChange={setShowLoginDialog}
         onLoginSuccess={handleLoginSuccess}
       />
+
+      {isAuthenticated && (
+        <Link href="/cart">
+          <Button
+            className="fixed bottom-6 right-6 shadow-lg flex items-center gap-2"
+            size="lg"
+          >
+            <ShoppingCart className="h-5 w-5" />
+            <span>View Cart</span>
+            <Badge variant="secondary">{itemCount}</Badge>
+          </Button>
+        </Link>
+      )}
     </div>
   );
 }

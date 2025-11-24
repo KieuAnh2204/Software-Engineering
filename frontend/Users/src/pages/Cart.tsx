@@ -5,23 +5,37 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Link } from "wouter";
-import { useCart } from "@/contexts/CartContext";
+import { useCart, getLastCartRestaurantId } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Cart() {
-  const { cart, updateCartItem, removeFromCart, isLoading } = useCart();
+  const { cart, getCart, updateCartItem, removeFromCart, isLoading } = useCart();
   const { toast } = useToast();
 
-  // TODO: Get restaurant ID from the cart or context
-  const restaurantId = cart?.restaurant_id || "restaurant_id_placeholder";
+  // Prefer restaurant_id from cart; fall back to last stored
+  const restaurantId = cart?.restaurant_id || getLastCartRestaurantId();
+
+  useEffect(() => {
+    if (!cart && restaurantId) {
+      getCart(restaurantId).catch((error: any) => {
+        console.error("Failed to load cart", error);
+        toast({
+          title: "Error",
+          description: error?.response?.data?.message || "Failed to load cart",
+          variant: "destructive",
+        });
+      });
+    }
+  }, [cart, restaurantId, getCart, toast]);
   
   const cartItems = cart?.items || [];
   const subtotal = cart?.total_amount || 0;
-  const deliveryFee = 2.99;
-  const serviceFee = 1.50;
+  const deliveryFee = 25000;
+  const serviceFee = 12000;
   const total = subtotal + deliveryFee + serviceFee;
 
   const handleUpdateQuantity = async (itemId: string, currentQuantity: number, change: number) => {
+    if (!restaurantId) return;
     const newQuantity = currentQuantity + change;
     if (newQuantity < 1) return;
 
@@ -37,6 +51,7 @@ export default function Cart() {
   };
 
   const handleRemoveItem = async (itemId: string) => {
+    if (!restaurantId) return;
     try {
       await removeFromCart(restaurantId, itemId);
       toast({

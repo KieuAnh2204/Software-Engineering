@@ -5,6 +5,9 @@ const { authenticate, authorize } = require('../middleware/auth');
 const cart = require('../controllers/cartController');
 const order = require('../controllers/orderController');
 
+// Payment callback (service-to-service) - uses shared secret, no JWT
+router.post('/payment/callback', order.paymentCallback);
+
 router.use(authenticate);
 
 // cart

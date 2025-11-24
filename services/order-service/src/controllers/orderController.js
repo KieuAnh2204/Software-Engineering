@@ -1,6 +1,14 @@
 const Order = require('../models/Order');
 const { io } = require('../index');
 
+const PAYMENT_SECRET_HEADER = 'x-payment-signature';
+
+const canAutoConfirmStatuses = [
+  'submitted',
+  'payment_pending',
+  'payment_failed',
+];
+
 const ORDER_STATUSES = [
   'cart',
   'submitted',
@@ -120,6 +128,81 @@ exports.mockMarkPaid = async (req, res, next) => {
     io.to(`restaurant-${order.restaurant_id}`).emit('order:update', order);
 
     res.json({ order });
+  } catch (e) {
+    next(e);
+  }
+};
+
+exports.paymentCallback = async (req, res, next) => {
+  try {
+    const secret = process.env.PAYMENT_WEBHOOK_SECRET;
+    if (!secret) {
+      return res
+        .status(500)
+        .json({ message: 'PAYMENT_WEBHOOK_SECRET not configured' });
+    }
+    const sig =
+      req.headers[PAYMENT_SECRET_HEADER] ||
+      req.headers[PAYMENT_SECRET_HEADER.toLowerCase()];
+    if (sig !== secret) {
+      return res.status(401).json({ message: 'Invalid signature' });
+    }
+
+    const { orderId, status, transaction_id, provider } = req.body;
+    if (!orderId || !status) {
+      return res
+        .status(400)
+        .json({ message: 'orderId and status are required' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    const normalized = String(status).toLowerCase();
+    let changed = false;
+
+    if (normalized === 'success' || normalized === 'paid') {
+      order.payment_status = 'paid';
+      if (canAutoConfirmStatuses.includes(order.status)) {
+        order.status = 'confirmed';
+      }
+      order.paid_at = new Date();
+      changed = true;
+    } else if (
+      normalized === 'failed' ||
+      normalized === 'error' ||
+      normalized === 'cancelled'
+    ) {
+      order.payment_status = 'payment_failed';
+      if (order.status === 'submitted' || order.status === 'payment_pending') {
+        order.status = 'payment_failed';
+      }
+      changed = true;
+    } else if (normalized === 'pending') {
+      order.payment_status = 'pending';
+      if (order.status === 'submitted') {
+        order.status = 'payment_pending';
+      }
+      changed = true;
+    }
+
+    if (!changed) {
+      return res.status(400).json({ message: 'Unsupported status' });
+    }
+
+    order.updated_at = new Date();
+    // Optionally track last payment provider / transaction id in custom fields
+    if (provider) order.payment_method = order.payment_method || provider;
+    if (transaction_id) order.payment_txn_id = transaction_id; // not in schema, Mongoose will still store
+
+    await order.save();
+
+    io.to(`customer-${order.customer_id}`).emit('order:update', order);
+    io.to(`restaurant-${order.restaurant_id}`).emit('order:update', order);
+
+    return res.json({ message: 'Payment status updated', order });
   } catch (e) {
     next(e);
   }
