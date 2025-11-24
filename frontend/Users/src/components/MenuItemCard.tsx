@@ -33,7 +33,7 @@ export function MenuItemCard({
           {description}
         </p>
         <div className="flex items-center justify-between">
-          <span className="text-xl font-bold">${price.toFixed(2)}</span>
+          <span className="text-xl font-bold">{price.toFixed(2)}</span>
           <Button
             size="icon"
             data-testid={`button-add-${name.toLowerCase().replace(/\s+/g, "-")}`}
