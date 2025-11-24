@@ -37,8 +37,17 @@ const notifyOrderService = async ({ orderId, status, transaction_id }) => {
 exports.createVNPayPayment = async (req, res, next) => {
   try {
     const { orderId, userId, amount, orderInfo, returnUrl, bankCode } = req.body;
-    if (!orderId || !userId || !amount) {
+    if (!orderId || !userId || amount === undefined || amount === null) {
       return res.status(400).json({ message: 'orderId, userId, and amount are required' });
+    }
+    if (!vnpConfig.tmnCode || !vnpConfig.hashSecret) {
+      return res
+        .status(500)
+        .json({ message: 'VNPAY_TMN_CODE or VNPAY_HASH_SECRET is not configured' });
+    }
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      return res.status(400).json({ message: 'amount must be a positive number (VND)' });
     }
 
     // Create Payment record first to get an id/txnRef
@@ -46,7 +55,7 @@ exports.createVNPayPayment = async (req, res, next) => {
     const payment = await Payment.create({
       orderId,
       userId,
-      amount,
+      amount: amt,
       currency: 'VND',
       provider: 'vnpay',
       status: 'created',
@@ -56,7 +65,7 @@ exports.createVNPayPayment = async (req, res, next) => {
 
     const { paymentUrl, params } = buildPaymentUrl({
       vnp_TxnRef: txnRef,
-      amount,
+      amount: amt,
       orderInfo,
       ipAddr:
         req.headers['x-forwarded-for'] ||
@@ -71,11 +80,27 @@ exports.createVNPayPayment = async (req, res, next) => {
     payment.expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     await payment.save();
 
+    // Debug log to help diagnose VNPAY format issues
+    console.log('[VNPAY] Created payment', {
+      vnp_TxnRef: txnRef,
+      vnp_Amount: params.vnp_Amount,
+      vnp_ReturnUrl: params.vnp_ReturnUrl,
+      vnp_IpnUrl: params.vnp_IpnUrl,
+      orderId,
+      userId,
+    });
+
     res.status(201).json({
       success: true,
       paymentUrl,
       paymentId: payment._id,
       vnp_TxnRef: txnRef,
+      params: {
+        vnp_TxnRef: params.vnp_TxnRef,
+        vnp_Amount: params.vnp_Amount,
+        vnp_ReturnUrl: params.vnp_ReturnUrl,
+        vnp_OrderInfo: params.vnp_OrderInfo,
+      },
     });
   } catch (error) {
     next(error);

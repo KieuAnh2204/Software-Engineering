@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const connectDB = require('./config/database');
 const orderRoutes = require('./routes/orderRoutes');
 const errorHandler = require('./middleware/errorHandler');
+const { setIO } = require('./socket');
 
 // Load environment variables
 dotenv.config();
@@ -23,6 +24,7 @@ const io = new Server(server, {
     credentials: true,
   },
 });
+setIO(io);
 
 // Middleware
 app.use(helmet());
@@ -94,4 +96,4 @@ server.listen(PORT, () => {
   console.log(`Order Service running on port ${PORT}`);
 });
 
-module.exports = { app, io };
+module.exports = { app, io, server };

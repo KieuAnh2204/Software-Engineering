@@ -15,6 +15,9 @@ import { useToast } from "@/hooks/use-toast";
 import axios from "axios";
 import { useAuth } from "@/hooks/useAuth";
 
+const ORDER_API = import.meta.env?.VITE_ORDER_API ?? "http://localhost:3002/api/orders";
+const PAYMENT_API = import.meta.env?.VITE_PAYMENT_API ?? "http://localhost:3004/api/payments";
+
 type PaymentMethod = "vnpay";
 
 export default function Checkout() {
@@ -23,7 +26,7 @@ export default function Checkout() {
   const [deliveryNote, setDeliveryNote] = useState("");
   const { cart, getCart, isLoading } = useCart();
   const { toast } = useToast();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   const restaurantId = cart?.restaurant_id || getLastCartRestaurantId();
 
@@ -70,13 +73,9 @@ export default function Checkout() {
 
   const formatVND = (value: number) => `${value.toLocaleString("vi-VN")} ₫`;
 
-  const handlePlaceOrder = () => {
-    console.log("Order placed:", {
-      paymentMethod,
-      deliveryAddress,
-      deliveryNote,
-      total,
-    });
+  const getAuthHeader = () => {
+    const token = localStorage.getItem("token");
+    return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
   const handleSaveAddress = async () => {
@@ -114,6 +113,61 @@ export default function Checkout() {
       toast({
         title: "Error",
         description: error?.response?.data?.message || "Failed to save address",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePlaceOrder = async () => {
+    if (!cart || !restaurantId) {
+      toast({
+        title: "Missing cart",
+        description: "Please add items to cart before checkout.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!deliveryAddress) {
+      toast({
+        title: "Address required",
+        description: "Please provide a delivery address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      // 1) Submit cart to order-service
+      const orderRes = await axios.post(
+        `${ORDER_API}/cart/checkout`,
+        {
+          restaurant_id: restaurantId,
+          payment_method: paymentMethod,
+          long_address: deliveryAddress,
+        },
+        { headers: getAuthHeader() }
+      );
+      const order = orderRes.data?.order || orderRes.data;
+      if (!order?._id) throw new Error("Order not created");
+
+      // 2) Create VNPAY payment and redirect
+      const payRes = await axios.post(
+        `${PAYMENT_API}/vnpay/create`,
+        {
+          orderId: order._id,
+          userId: user?.id,
+          amount: total, // VND
+          orderInfo: `Thanh toan don hang ${order._id}`,
+        },
+        { headers: getAuthHeader() }
+      );
+      const paymentUrl = payRes.data?.paymentUrl;
+      if (!paymentUrl) throw new Error("Payment URL not received");
+      window.location.href = paymentUrl;
+    } catch (error: any) {
+      console.error("Checkout error", error);
+      toast({
+        title: "Payment error",
+        description: error?.response?.data?.message || error.message || "Failed to start payment",
         variant: "destructive",
       });
     }

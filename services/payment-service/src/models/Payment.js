@@ -34,13 +34,13 @@ const paymentSchema = new mongoose.Schema(
       default: 'created',
       index: true,
     },
-    paymentUrl: { type: String }, // URL customer should be redirected to
-    returnUrl: { type: String }, // frontend return URL used to build VNPAY request
+    paymentUrl: { type: String },
+    returnUrl: { type: String },
     clientIp: { type: String },
 
     // VNPAY specific fields
-    vnp_TxnRef: { type: String, index: true }, // merchant order ref
-    vnp_TransactionNo: { type: String }, // VNPAY transaction number
+    vnp_TxnRef: { type: String, index: true },
+    vnp_TransactionNo: { type: String },
     vnp_ResponseCode: { type: String },
     vnp_BankCode: { type: String },
     vnp_CardType: { type: String },
@@ -67,7 +67,7 @@ const paymentSchema = new mongoose.Schema(
   }
 );
 
-// Index for faster queries
+// Indexes
 paymentSchema.index({ userId: 1, createdAt: -1 });
 paymentSchema.index({ vnp_TxnRef: 1 }, { unique: true, sparse: true });
 

@@ -71,7 +71,7 @@ function buildPaymentUrl({
     vnp_ExpireDate: expireDate,
   };
   if (bankCode) params.vnp_BankCode = bankCode;
-  if (config.ipnUrl) params.vnp_IpnUrl = config.ipnUrl;
+  // Note: IPN URL is configured in the VNPAY portal; do not send vnp_IpnUrl here.
 
   const sorted = sortObject(params);
   const signData = querystring.stringify(sorted, { encode: false });

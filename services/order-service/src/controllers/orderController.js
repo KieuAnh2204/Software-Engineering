@@ -1,5 +1,5 @@
 const Order = require('../models/Order');
-const { io } = require('../index');
+const { getIO } = require('../socket');
 
 const PAYMENT_SECRET_HEADER = 'x-payment-signature';
 
@@ -124,8 +124,11 @@ exports.mockMarkPaid = async (req, res, next) => {
     await order.save();
 
     // Broadcast payment/status change
-    io.to(`customer-${order.customer_id}`).emit('order:update', order);
-    io.to(`restaurant-${order.restaurant_id}`).emit('order:update', order);
+    const io = getIO();
+    if (io) {
+      io.to(`customer-${order.customer_id}`).emit('order:update', order);
+      io.to(`restaurant-${order.restaurant_id}`).emit('order:update', order);
+    }
 
     res.json({ order });
   } catch (e) {
@@ -199,8 +202,11 @@ exports.paymentCallback = async (req, res, next) => {
 
     await order.save();
 
-    io.to(`customer-${order.customer_id}`).emit('order:update', order);
-    io.to(`restaurant-${order.restaurant_id}`).emit('order:update', order);
+    const io = getIO();
+    if (io) {
+      io.to(`customer-${order.customer_id}`).emit('order:update', order);
+      io.to(`restaurant-${order.restaurant_id}`).emit('order:update', order);
+    }
 
     return res.json({ message: 'Payment status updated', order });
   } catch (e) {
