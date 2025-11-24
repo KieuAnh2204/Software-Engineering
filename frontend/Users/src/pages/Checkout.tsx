@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ArrowLeft, CreditCard, Banknote, Building2, Check } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Check } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,18 +10,65 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
+import { useCart, getLastCartRestaurantId } from "@/contexts/CartContext";
+import { useToast } from "@/hooks/use-toast";
+import axios from "axios";
+import { useAuth } from "@/hooks/useAuth";
 
-type PaymentMethod = "cash" | "transfer" | "card";
+type PaymentMethod = "vnpay";
 
 export default function Checkout() {
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
-  const [deliveryAddress, setDeliveryAddress] = useState("123 Main St, Apt 4B");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("vnpay");
+  const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryNote, setDeliveryNote] = useState("");
+  const { cart, getCart, isLoading } = useCart();
+  const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
 
-  const subtotal = 60.96;
-  const deliveryFee = 2.99;
-  const serviceFee = 1.50;
+  const restaurantId = cart?.restaurant_id || getLastCartRestaurantId();
+
+  useEffect(() => {
+    if (!cart && restaurantId) {
+      getCart(restaurantId).catch((error: any) => {
+        console.error("Failed to load cart", error);
+        toast({
+          title: "Error",
+          description: error?.response?.data?.message || "Failed to load cart",
+          variant: "destructive",
+        });
+      });
+    }
+  }, [cart, restaurantId, getCart, toast]);
+
+  useEffect(() => {
+    const fetchAddress = async () => {
+      if (!isAuthenticated) return;
+      try {
+        const token = localStorage.getItem("token");
+        const res = await axios.get("http://localhost:3001/api/auth/customers/me", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const addr = res.data?.data?.customer?.address;
+        if (addr) {
+          setDeliveryAddress(addr);
+        }
+      } catch (error) {
+        console.error("Failed to load user address", error);
+      }
+    };
+    fetchAddress();
+  }, [isAuthenticated]);
+
+  const deliveryFee = 25000; // static placeholder (VND)
+  const serviceFee = 12000; // static placeholder (VND)
+
+  const subtotal = useMemo(() => {
+    return cart?.total_amount || 0;
+  }, [cart]);
+
   const total = subtotal + deliveryFee + serviceFee;
+
+  const formatVND = (value: number) => `${value.toLocaleString("vi-VN")} ₫`;
 
   const handlePlaceOrder = () => {
     console.log("Order placed:", {
@@ -30,6 +77,46 @@ export default function Checkout() {
       deliveryNote,
       total,
     });
+  };
+
+  const handleSaveAddress = async () => {
+    if (!restaurantId) {
+      toast({
+        title: "Missing restaurant",
+        description: "No restaurant found for this cart.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to save your address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      await axios.patch(
+        `${import.meta.env?.VITE_ORDER_API ?? "http://localhost:3002/api/orders"}/cart/address`,
+        {
+          restaurant_id: restaurantId,
+          long_address: deliveryAddress,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      toast({ title: "Address saved", description: "Delivery address updated for this order." });
+    } catch (error: any) {
+      console.error("Failed to save address", error);
+      toast({
+        title: "Error",
+        description: error?.response?.data?.message || "Failed to save address",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -61,6 +148,16 @@ export default function Checkout() {
                     onChange={(e) => setDeliveryAddress(e.target.value)}
                     data-testid="input-address"
                   />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={handleSaveAddress}
+                    disabled={!deliveryAddress}
+                    data-testid="button-save-address"
+                  >
+                    Save address to order
+                  </Button>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="note">Delivery Instructions (Optional)</Label>
@@ -80,141 +177,32 @@ export default function Checkout() {
                 <CardTitle>Payment Method</CardTitle>
               </CardHeader>
               <CardContent>
-                <RadioGroup
-                  value={paymentMethod}
-                  onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
-                >
+                <RadioGroup value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}>
                   <div
                     className={cn(
                       "flex items-center gap-4 p-4 rounded-md border-2 cursor-pointer hover-elevate active-elevate-2 transition-colors",
-                      paymentMethod === "cash"
-                        ? "border-primary bg-primary/5"
-                        : "border-border"
+                      "border-primary bg-primary/5"
                     )}
-                    onClick={() => setPaymentMethod("cash")}
-                    data-testid="option-payment-cash"
+                    onClick={() => setPaymentMethod("vnpay")}
+                    data-testid="option-payment-vnpay"
                   >
-                    <RadioGroupItem value="cash" id="cash" />
+                    <RadioGroupItem value="vnpay" id="vnpay" />
                     <div className="flex items-center gap-3 flex-1">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Banknote className="h-5 w-5 text-primary" />
+                        <Check className="h-5 w-5 text-primary" />
                       </div>
                       <div>
-                        <Label htmlFor="cash" className="font-semibold cursor-pointer">
-                          Cash on Delivery
+                        <Label htmlFor="vnpay" className="font-semibold cursor-pointer">
+                          VNPAY
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          Pay with cash when your order arrives
+                          Pay securely via VNPAY
                         </p>
                       </div>
                     </div>
-                    {paymentMethod === "cash" && (
-                      <Check className="h-5 w-5 text-primary" />
-                    )}
-                  </div>
-
-                  <div
-                    className={cn(
-                      "flex items-center gap-4 p-4 rounded-md border-2 cursor-pointer hover-elevate active-elevate-2 transition-colors",
-                      paymentMethod === "transfer"
-                        ? "border-primary bg-primary/5"
-                        : "border-border"
-                    )}
-                    onClick={() => setPaymentMethod("transfer")}
-                    data-testid="option-payment-transfer"
-                  >
-                    <RadioGroupItem value="transfer" id="transfer" />
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Building2 className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <Label htmlFor="transfer" className="font-semibold cursor-pointer">
-                          Bank Transfer
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Pay directly via bank transfer
-                        </p>
-                      </div>
-                    </div>
-                    {paymentMethod === "transfer" && (
-                      <Check className="h-5 w-5 text-primary" />
-                    )}
-                  </div>
-
-                  <div
-                    className={cn(
-                      "flex items-center gap-4 p-4 rounded-md border-2 cursor-pointer hover-elevate active-elevate-2 transition-colors",
-                      paymentMethod === "card"
-                        ? "border-primary bg-primary/5"
-                        : "border-border"
-                    )}
-                    onClick={() => setPaymentMethod("card")}
-                    data-testid="option-payment-card"
-                  >
-                    <RadioGroupItem value="card" id="card" />
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <CreditCard className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <Label htmlFor="card" className="font-semibold cursor-pointer">
-                          Credit/Debit Card
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Pay securely with your card
-                        </p>
-                      </div>
-                    </div>
-                    {paymentMethod === "card" && (
-                      <Check className="h-5 w-5 text-primary" />
-                    )}
+                    <Check className="h-5 w-5 text-primary" />
                   </div>
                 </RadioGroup>
-
-                {paymentMethod === "transfer" && (
-                  <div className="mt-4 p-4 bg-muted rounded-md">
-                    <p className="text-sm font-medium mb-2">Bank Details:</p>
-                    <div className="text-sm space-y-1 text-muted-foreground">
-                      <p>Bank: FoodFast Bank</p>
-                      <p>Account: 1234-5678-9012</p>
-                      <p>Account Name: FoodFast Delivery Ltd.</p>
-                    </div>
-                  </div>
-                )}
-
-                {paymentMethod === "card" && (
-                  <div className="mt-4 space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="cardNumber">Card Number</Label>
-                      <Input
-                        id="cardNumber"
-                        placeholder="1234 5678 9012 3456"
-                        data-testid="input-card-number"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="expiry">Expiry Date</Label>
-                        <Input
-                          id="expiry"
-                          placeholder="MM/YY"
-                          data-testid="input-card-expiry"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="cvv">CVV</Label>
-                        <Input
-                          id="cvv"
-                          placeholder="123"
-                          type="password"
-                          maxLength={3}
-                          data-testid="input-card-cvv"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </div>
@@ -228,21 +216,21 @@ export default function Checkout() {
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span className="font-medium">${subtotal.toFixed(2)}</span>
+                    <span className="font-medium">{formatVND(subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Delivery fee</span>
-                    <span className="font-medium">${deliveryFee.toFixed(2)}</span>
+                    <span className="font-medium">{formatVND(deliveryFee)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Service fee</span>
-                    <span className="font-medium">${serviceFee.toFixed(2)}</span>
+                    <span className="font-medium">{formatVND(serviceFee)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-lg">
                     <span className="font-bold">Total</span>
                     <span className="font-bold text-primary">
-                      ${total.toFixed(2)}
+                      {formatVND(total)}
                     </span>
                   </div>
                 </div>
@@ -252,6 +240,7 @@ export default function Checkout() {
                   size="lg"
                   onClick={handlePlaceOrder}
                   data-testid="button-place-order"
+                  disabled={!cart || cart.items.length === 0 || isLoading}
                 >
                   Place Order
                 </Button>

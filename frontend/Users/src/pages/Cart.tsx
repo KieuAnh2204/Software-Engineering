@@ -34,6 +34,8 @@ export default function Cart() {
   const serviceFee = 12000;
   const total = subtotal + deliveryFee + serviceFee;
 
+  const formatVND = (value: number) => `${value.toLocaleString("vi-VN")} ₫`;
+
   const handleUpdateQuantity = async (itemId: string, currentQuantity: number, change: number) => {
     if (!restaurantId) return;
     const newQuantity = currentQuantity + change;
@@ -127,7 +129,7 @@ export default function Cart() {
                       )}
                       <div className="flex items-center justify-between">
                         <span className="text-lg font-bold">
-                          ${item.price.toFixed(2)}
+                          {formatVND(item.price)}
                         </span>
                         <div className="flex items-center gap-3">
                           <div className="flex items-center gap-2">
@@ -182,21 +184,21 @@ export default function Cart() {
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span className="font-medium">${subtotal.toFixed(2)}</span>
+                    <span className="font-medium">{formatVND(subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Delivery fee</span>
-                    <span className="font-medium">${deliveryFee.toFixed(2)}</span>
+                    <span className="font-medium">{formatVND(deliveryFee)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Service fee</span>
-                    <span className="font-medium">${serviceFee.toFixed(2)}</span>
+                    <span className="font-medium">{formatVND(serviceFee)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-lg">
                     <span className="font-bold">Total</span>
                     <span className="font-bold text-primary">
-                      ${total.toFixed(2)}
+                      {formatVND(total)}
                     </span>
                   </div>
                 </div>

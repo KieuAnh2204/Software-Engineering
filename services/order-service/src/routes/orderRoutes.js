@@ -17,6 +17,7 @@ router.patch('/cart/items/:itemId', cart.updateItem);
 router.delete('/cart/items/:itemId', cart.removeItem);
 router.delete('/cart', cart.clearCart);
 router.post('/cart/checkout', cart.checkout);
+router.patch('/cart/address', cart.updateAddress);
 
 // restaurant (owner/admin)
 router.get(

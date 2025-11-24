@@ -166,3 +166,36 @@ exports.checkout = async (req, res, next) => {
   }
 };
 
+exports.updateAddress = async (req, res, next) => {
+  try {
+    const customer_id = req.user.id;
+    const { restaurant_id, long_address } = req.body;
+    if (!restaurant_id) {
+      return res
+        .status(400)
+        .json({ message: 'restaurant_id is required' });
+    }
+    if (!long_address || typeof long_address !== 'string') {
+      return res
+        .status(400)
+        .json({ message: 'long_address is required' });
+    }
+
+    const order = await Order.findOne({
+      customer_id,
+      restaurant_id,
+      status: 'cart',
+    });
+    if (!order) {
+      return res.status(404).json({ message: 'Cart not found' });
+    }
+    order.long_address = long_address;
+    order.updated_at = new Date();
+    await order.save();
+
+    res.json(order);
+  } catch (e) {
+    next(e);
+  }
+};
+
