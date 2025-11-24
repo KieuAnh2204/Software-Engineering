@@ -6,6 +6,7 @@ const path = require('path');
 const connectDB = require('./config/database');
 const restaurantRoutes = require('./routes/restaurantRoutes');
 const dishRoutes = require('./routes/dishRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 // For debugging why process exits early, log basic startup info
@@ -50,6 +51,7 @@ app.get('/health', (req, res) => {
 // API Routes - use real database routes
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/dishes', dishRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handling
 app.use(errorHandler);

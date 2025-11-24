@@ -203,6 +203,11 @@ const respondWithAuthPayload = (res, user, profileKey, profileValue, message, st
     created_at: userObj.createdAt,
     updated_at: userObj.updatedAt
   };
+
+  // Add owner_id for owner role
+  if (userObj.role === 'owner' && profileObj._id) {
+    responseUser.owner_id = profileObj._id.toString();
+  }
   
   res.status(status).json({
     success: true,
