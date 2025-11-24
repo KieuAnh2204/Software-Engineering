@@ -7,6 +7,7 @@ const {
   clearCart,
   recalcTotal,
 } = require('../services/cartService');
+const { io } = require('../index');
 const { AppError } = require('../utils/appError');
 
 const paymentMethods = ['cod', 'vnpay', 'momo', 'card'];
@@ -152,6 +153,10 @@ exports.checkout = async (req, res, next) => {
     order.submitted_at = new Date();
     order.updated_at = new Date();
     await order.save();
+
+    // Broadcast to customer and restaurant listeners
+    io.to(`customer-${order.customer_id}`).emit('order:update', order);
+    io.to(`restaurant-${order.restaurant_id}`).emit('order:update', order);
 
     // Optional: integrate with PAYMENT_SERVICE_URL here for non-COD
 

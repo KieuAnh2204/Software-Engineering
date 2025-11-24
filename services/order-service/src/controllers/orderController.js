@@ -1,4 +1,5 @@
 const Order = require('../models/Order');
+const { io } = require('../index');
 
 const ORDER_STATUSES = [
   'cart',
@@ -113,6 +114,10 @@ exports.mockMarkPaid = async (req, res, next) => {
     order.paid_at = new Date();
     order.updated_at = new Date();
     await order.save();
+
+    // Broadcast payment/status change
+    io.to(`customer-${order.customer_id}`).emit('order:update', order);
+    io.to(`restaurant-${order.restaurant_id}`).emit('order:update', order);
 
     res.json({ order });
   } catch (e) {
