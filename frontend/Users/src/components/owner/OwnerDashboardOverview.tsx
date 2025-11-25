@@ -38,7 +38,11 @@ type Order = {
   quantity?: number;
 };
 
-export default function OwnerDashboardOverview() {
+export default function OwnerDashboardOverview({
+  onNavigate,
+}: {
+  onNavigate?: (view: string) => void;
+}) {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(true);
   const [stats, setStats] = useState<Stats>({
@@ -244,6 +248,16 @@ export default function OwnerDashboardOverview() {
                 : (stats.pendingOrders || pendingOrders.length)}
             </div>
             <p className="text-xs text-muted-foreground">Needs attention</p>
+            <div className="mt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onNavigate?.("pending-orders")}
+                data-testid="button-view-pending"
+              >
+                View Pending Orders
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

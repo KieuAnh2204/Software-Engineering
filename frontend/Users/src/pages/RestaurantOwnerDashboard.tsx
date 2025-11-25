@@ -39,14 +39,16 @@ import OwnerMenuManagement from "@/components/owner/OwnerMenuManagement";
 import OwnerPendingOrders from "@/components/owner/OwnerPendingOrders";
 import OwnerReadyOrders from "@/components/owner/OwnerReadyOrders";
 import OwnerOrderHistory from "@/components/owner/OwnerOrderHistory";
+import OwnerPreparingOrders from "@/components/owner/OwnerPreparingOrders";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", value: "dashboard" },
-  { icon: UtensilsCrossed, label: "Menu Items", value: "menu" },
+  { icon: UtensilsCrossed, label: "Menu Item", value: "menu" },
 ];
 
 const orderMenuItems = [
   { icon: Clock, label: "Pending Orders", value: "pending-orders" },
+  { icon: Truck, label: "Preparing Orders", value: "preparing-orders" },
   { icon: Truck, label: "Ready Orders", value: "ready-orders" },
   { icon: History, label: "Order History", value: "order-history" },
 ];
@@ -66,6 +68,13 @@ export default function RestaurantOwnerDashboard() {
   const handleLogout = () => {
     ownerLogout();
     setLocation("/owner/login");
+  };
+
+  const handleNavigate = (view: string) => {
+    setActiveView(view);
+    if (view.includes("order")) {
+      setOrdersOpen(true);
+    }
   };
 
   if (!isOwnerAuthenticated) {
@@ -101,7 +110,7 @@ export default function RestaurantOwnerDashboard() {
                     {menuItems.map((item) => (
                       <SidebarMenuItem key={item.value}>
                         <SidebarMenuButton
-                          onClick={() => setActiveView(item.value)}
+                          onClick={() => handleNavigate(item.value)}
                           data-active={activeView === item.value}
                           data-testid={`button-nav-${item.value}`}
                         >
@@ -126,7 +135,7 @@ export default function RestaurantOwnerDashboard() {
                             {orderMenuItems.map((item) => (
                               <SidebarMenuSubItem key={item.value}>
                                 <SidebarMenuSubButton
-                                  onClick={() => setActiveView(item.value)}
+                                  onClick={() => handleNavigate(item.value)}
                                   data-active={activeView === item.value}
                                   data-testid={`button-nav-${item.value}`}
                                 >
@@ -189,9 +198,12 @@ export default function RestaurantOwnerDashboard() {
             </header>
 
             <main className="flex-1 overflow-auto p-6">
-              {activeView === "dashboard" && <OwnerDashboardOverview />}
+              {activeView === "dashboard" && (
+                <OwnerDashboardOverview onNavigate={handleNavigate} />
+              )}
               {activeView === "menu" && <OwnerMenuManagement />}
               {activeView === "pending-orders" && <OwnerPendingOrders />}
+              {activeView === "preparing-orders" && <OwnerPreparingOrders />}
               {activeView === "ready-orders" && <OwnerReadyOrders />}
               {activeView === "order-history" && <OwnerOrderHistory />}
             </main>

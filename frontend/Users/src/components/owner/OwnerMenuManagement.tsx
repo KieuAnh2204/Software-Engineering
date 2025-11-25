@@ -102,7 +102,14 @@ export default function OwnerMenuManagement() {
         const existingRestaurant = res.data.data;
         console.log("Found existing restaurant:", existingRestaurant);
         setRestaurantId(existingRestaurant._id);
-        setFormData(prev => ({ ...prev, restaurant_id: existingRestaurant._id }));
+        setFormData((prev) => ({ ...prev, restaurant_id: existingRestaurant._id }));
+        try {
+          localStorage.setItem("restaurant_id", existingRestaurant._id);
+          localStorage.setItem("owner_restaurant_id", existingRestaurant._id);
+          localStorage.setItem("restaurantId", existingRestaurant._id);
+        } catch {
+          // ignore storage errors
+        }
         return;
       }
     } catch (error: any) {
