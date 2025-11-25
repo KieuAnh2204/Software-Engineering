@@ -3,7 +3,7 @@ import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Truck, Package, CheckCircle2 } from "lucide-react";
+import { Truck, Package, CheckCircle2, RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -37,14 +37,31 @@ export default function OwnerReadyOrders() {
 
   const token = localStorage.getItem("token") || "";
   const orderBaseUrl =
-    import.meta.env.VITE_ORDER_BASE_URL || import.meta.env.VITE_ORDER_API;
+    import.meta.env.VITE_ORDER_BASE_URL ||
+    import.meta.env.VITE_ORDER_API ||
+    "http://localhost:3002/api/orders";
+  const restaurantId =
+    localStorage.getItem("restaurant_id") ||
+    localStorage.getItem("owner_restaurant_id") ||
+    localStorage.getItem("restaurantId") ||
+    "";
+
+  const formatVND = (value?: number) =>
+    `${(value || 0).toLocaleString("vi-VN")} ₫`;
 
   const fetchOrders = useCallback(async () => {
-    if (!orderBaseUrl) return;
+    if (!orderBaseUrl || !restaurantId) {
+      toast({
+        title: "Missing restaurant",
+        description: "No restaurant id found for this owner.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       setLoading(true);
       const res = await axios.get(
-        `${orderBaseUrl}/orders?status=ready`,
+        `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=ready_for_pickup`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -64,21 +81,21 @@ export default function OwnerReadyOrders() {
 
   useEffect(() => {
     fetchOrders();
-  }, [fetchOrders]);
+  }, [fetchOrders, restaurantId]);
 
-  const handleMarkCompleted = async (orderId: string) => {
-    if (!orderBaseUrl) return;
+  const handleStartDelivering = async (orderId: string) => {
+    if (!orderBaseUrl || !restaurantId) return;
     try {
       await axios.patch(
-        `${orderBaseUrl}/orders/${orderId}/status`,
-        { status: "completed" },
+        `${orderBaseUrl}/${orderId}/status`,
+        { status: "delivering", restaurant_id: restaurantId },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
       await fetchOrders();
-      toast({ title: "Order marked as completed" });
+      toast({ title: "Order marked as delivering" });
     } catch (err) {
       console.error("Error updating order:", err);
       toast({
@@ -89,8 +106,12 @@ export default function OwnerReadyOrders() {
   };
 
   const readyOrders =
-    orders.filter((order) => order.status === "ready") || [];
-  const ordersToRender = readyOrders.length > 0 ? readyOrders : orders;
+    orders.filter(
+      (order) =>
+        order.status === "ready_for_pickup" &&
+        order.payment_status === "paid"
+    ) || [];
+  const ordersToRender = readyOrders;
 
   if (loading) {
     return (
@@ -109,6 +130,16 @@ export default function OwnerReadyOrders() {
           <p className="text-sm text-muted-foreground">
             Orders marked as ready will appear here
           </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4"
+            onClick={fetchOrders}
+            data-testid="button-refresh-ready"
+          >
+            <RefreshCcw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </CardContent>
       </Card>
     );
@@ -116,6 +147,20 @@ export default function OwnerReadyOrders() {
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold">Ready Orders</h2>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={fetchOrders}
+          disabled={loading}
+          data-testid="button-refresh-ready"
+          className="flex items-center gap-2"
+        >
+          <RefreshCcw className="h-4 w-4" />
+          Refresh
+        </Button>
+      </div>
       {ordersToRender.map((order) => {
         const orderId = order._id || order.id || "";
         const totalAmount = order.total_amount || order.totalAmount || 0;
@@ -145,7 +190,7 @@ export default function OwnerReadyOrders() {
                       variant="default"
                       data-testid={`badge-status-${orderId}`}
                     >
-                      Ready
+                      Ready for Pickup / Paid
                     </Badge>
                     <span className="text-sm text-muted-foreground">
                       {orderedTime
@@ -155,17 +200,13 @@ export default function OwnerReadyOrders() {
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  <div className="flex items-center gap-2 text-primary">
-                    <Truck className="h-5 w-5" />
-                    <span className="text-sm font-medium">In transit</span>
-                  </div>
                   <Button
-                    onClick={() => handleMarkCompleted(orderId)}
+                    onClick={() => handleStartDelivering(orderId)}
                     disabled={loading}
-                    data-testid={`button-completed-${orderId}`}
+                    data-testid={`button-delivering-${orderId}`}
                   >
                     <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Completed
+                    Start Delivering
                   </Button>
                 </div>
               </div>
@@ -188,7 +229,7 @@ export default function OwnerReadyOrders() {
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span>Quantity: {quantity}</span>
                     <span className="font-medium text-foreground">
-                      Total: ${totalAmount}
+                      Total: {formatVND(totalAmount)}
                     </span>
                   </div>
                 </div>
