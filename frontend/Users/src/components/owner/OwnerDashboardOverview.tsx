@@ -1,13 +1,24 @@
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Package, ShoppingBag, TrendingUp, CheckCircle2 } from "lucide-react";
+import { DollarSign, Package, ShoppingBag, TrendingUp } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { isSameDay } from "date-fns";
+
+const TOTAL_ORDER_STATUSES = ["confirmed", "preparing", "ready_for_pickup", "completed"] as const;
+const PENDING_STATUSES = ["pending", "payment_pending", "submitted"] as const;
+const STATUS_QUERY = Array.from(
+  new Set([...TOTAL_ORDER_STATUSES, ...PENDING_STATUSES, "delivering"])
+).join(",");
+
+const normalizeStatus = (status?: string) =>
+  String(status || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
 
 type Stats = {
   totalRevenue: number;
@@ -19,6 +30,7 @@ type Stats = {
 type OrderItem = {
   name?: string;
   quantity?: number;
+  price?: number;
 };
 
 type Order = {
@@ -38,6 +50,33 @@ type Order = {
   quantity?: number;
 };
 
+const getOrderTotal = (order: Order) => {
+  const rawTotal = order.total_amount ?? order.totalAmount;
+  if (typeof rawTotal === "string") return parseFloat(rawTotal) || 0;
+  if (typeof rawTotal === "number") return rawTotal;
+
+  if (order.items?.length) {
+    return order.items.reduce(
+      (sum, item) => sum + (item.quantity || 0) * (item.price || 0),
+      0
+    );
+  }
+  return 0;
+};
+
+const parseOrderDate = (order: Order) => {
+  const dateValue = order.created_at || order.orderedAt;
+  if (!dateValue) return null;
+  const parsed = new Date(dateValue);
+  return isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const formatVND = (amount: number) =>
+  `VND ${new Intl.NumberFormat("vi-VN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount)}`;
+
 export default function OwnerDashboardOverview({
   onNavigate,
 }: {
@@ -51,58 +90,91 @@ export default function OwnerDashboardOverview({
     todaysOrders: 0,
     pendingOrders: 0,
   });
-  const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [loadingStats, setLoadingStats] = useState(false);
-  const [loadingOrders, setLoadingOrders] = useState(false);
 
-  const token = localStorage.getItem("token") || "";
+  const token =
+    localStorage.getItem("owner_token") ||
+    localStorage.getItem("token") ||
+    "";
   const orderBaseUrl =
-    import.meta.env.VITE_ORDER_BASE_URL || import.meta.env.VITE_ORDER_API;
+    import.meta.env.VITE_ORDER_BASE_URL ||
+    import.meta.env.VITE_ORDER_API ||
+    "http://localhost:3002/api/orders";
+  const restaurantId =
+    localStorage.getItem("restaurant_id") ||
+    localStorage.getItem("owner_restaurant_id") ||
+    localStorage.getItem("restaurantId") ||
+    "";
 
-  const fetchStats = useCallback(async () => {
-    if (!orderBaseUrl) return;
+  const computeStatsFromOrders = useCallback(
+    (orders: Order[]) => {
+      const normalized = orders.map((order) => ({
+        order,
+        normalizedStatus: normalizeStatus(order.status),
+        orderDate: parseOrderDate(order),
+      }));
+
+      const pending = normalized
+        .filter(({ normalizedStatus }) => PENDING_STATUSES.includes(normalizedStatus))
+        .map(({ order }) => order);
+
+      const totalOrders = normalized.filter(({ normalizedStatus }) =>
+        TOTAL_ORDER_STATUSES.includes(normalizedStatus)
+      ).length;
+
+      const todaysOrders = normalized.filter(
+        ({ orderDate }) => orderDate && isSameDay(orderDate, new Date())
+      ).length;
+
+      const totalRevenue = normalized.reduce(
+        (sum, { order }) => sum + getOrderTotal(order),
+        0
+      );
+
+      setStats({
+        totalRevenue,
+        totalOrders,
+        todaysOrders,
+        pendingOrders: pending.length,
+      });
+    },
+    []
+  );
+
+  const fetchOrdersAndStats = useCallback(async () => {
+    if (!orderBaseUrl || !restaurantId) {
+      setStats({
+        totalRevenue: 0,
+        totalOrders: 0,
+        todaysOrders: 0,
+        pendingOrders: 0,
+      });
+      return;
+    }
     try {
       setLoadingStats(true);
-      const res = await axios.get(`${orderBaseUrl}/orders/stats`, {
+      const res = await axios.get(`${orderBaseUrl}/restaurant`, {
+        params: {
+          restaurant_id: restaurantId,
+          status: STATUS_QUERY,
+          limit: 200,
+        },
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const data = res.data?.data || res.data || {};
-      setStats({
-        totalRevenue: Number(data.totalRevenue) || 0,
-        totalOrders: Number(data.totalOrders) || 0,
-        todaysOrders: Number(data.todaysOrders || data.todays_orders) || 0,
-        pendingOrders: Number(data.pendingOrders || data.pending_orders) || 0,
-      });
+      const orders = res.data?.data || res.data?.items || res.data?.orders || [];
+      computeStatsFromOrders(Array.isArray(orders) ? orders : []);
     } catch (error) {
-      console.error("Error loading stats:", error);
+      console.error("Error loading orders:", error);
       toast({
         title: "Unable to load stats",
+        description: "Could not load order metrics. Please try again.",
         variant: "destructive",
       });
     } finally {
       setLoadingStats(false);
     }
-  }, [orderBaseUrl, token, toast]);
-
-  const fetchPendingOrders = useCallback(async () => {
-    if (!orderBaseUrl) return;
-    try {
-      setLoadingOrders(true);
-      const res = await axios.get(
-        `${orderBaseUrl}/orders?status=preparing`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      setPendingOrders(res.data?.data || res.data?.items || []);
-    } catch (error) {
-      console.error("Error loading pending orders:", error);
-    } finally {
-      setLoadingOrders(false);
-    }
-  }, [orderBaseUrl, token]);
+  }, [STATUS_QUERY, computeStatsFromOrders, orderBaseUrl, restaurantId, token, toast]);
 
   const fetchRestaurantStatus = useCallback(async () => {
     try {
@@ -119,10 +191,9 @@ export default function OwnerDashboardOverview({
   }, [token]);
 
   useEffect(() => {
-    fetchStats();
-    fetchPendingOrders();
+    fetchOrdersAndStats();
     fetchRestaurantStatus();
-  }, [fetchPendingOrders, fetchRestaurantStatus, fetchStats]);
+  }, [fetchOrdersAndStats, fetchRestaurantStatus]);
 
   const handleStatusToggle = async (checked: boolean) => {
     try {
@@ -147,29 +218,6 @@ export default function OwnerDashboardOverview({
       toast({
         title: "Error",
         description: "Failed to update restaurant status",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleMarkReady = async (orderId: string) => {
-    if (!orderBaseUrl) return;
-    try {
-      await axios.patch(
-        `${orderBaseUrl}/orders/${orderId}/status`,
-        { status: "ready" },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      await fetchPendingOrders();
-      await fetchStats();
-      toast({ title: "Order status updated to ready" });
-    } catch (error) {
-      console.error("Error updating order status:", error);
-      toast({
-        title: "Failed to update order status",
         variant: "destructive",
       });
     }
@@ -204,7 +252,7 @@ export default function OwnerDashboardOverview({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-revenue">
-              {loadingStats ? "..." : `$${stats.totalRevenue.toFixed(2)}`}
+              {loadingStats ? "..." : formatVND(stats.totalRevenue)}
             </div>
             <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
@@ -232,7 +280,7 @@ export default function OwnerDashboardOverview({
             <div className="text-2xl font-bold" data-testid="text-today-orders">
               {loadingStats ? "..." : stats.todaysOrders}
             </div>
-            <p className="text-xs text-muted-foreground">In the last 24 hours</p>
+            <p className="text-xs text-muted-foreground">Placed today</p>
           </CardContent>
         </Card>
 
@@ -245,7 +293,7 @@ export default function OwnerDashboardOverview({
             <div className="text-2xl font-bold" data-testid="text-pending-orders">
               {loadingStats
                 ? "..."
-                : (stats.pendingOrders || pendingOrders.length)}
+                : stats.pendingOrders}
             </div>
             <p className="text-xs text-muted-foreground">Needs attention</p>
             <div className="mt-3">
@@ -261,83 +309,6 @@ export default function OwnerDashboardOverview({
           </CardContent>
         </Card>
       </div>
-
-      {(loadingOrders || pendingOrders.length > 0) && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Pending Orders
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {loadingOrders && (
-                <div className="text-sm text-muted-foreground">Loading pending orders...</div>
-              )}
-              {pendingOrders.map((order) => {
-                const orderId = order._id || order.id || "";
-                const dishName =
-                  order.items?.map((item) => item.name).filter(Boolean).join(", ") ||
-                  "Order";
-                const customerName = order.customer_name || order.customerName || "N/A";
-                const customerAddress =
-                  order.long_address || order.customer_address || order.customerAddress;
-                const quantity =
-                  order.quantity ||
-                  order.items?.reduce(
-                    (sum, item) => sum + (item.quantity || 0),
-                    0
-                  ) ||
-                  0;
-                const totalAmount = order.total_amount || order.totalAmount || 0;
-                const orderedTime = order.created_at || order.orderedAt;
-
-                return (
-                  <div 
-                    key={orderId} 
-                    className="flex items-center justify-between p-4 border rounded-md hover-elevate"
-                    data-testid={`pending-order-${orderId}`}
-                  >
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{dishName}</p>
-                        <Badge variant="default" data-testid={`badge-status-${orderId}`}>
-                          Preparing
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>Customer: {customerName}</span>
-                        <span>Qty: {quantity}</span>
-                        <span>Total: ${totalAmount}</span>
-                        <span>
-                          {orderedTime
-                            ? format(new Date(orderedTime), "MMM d, h:mm a")
-                            : "N/A"}
-                        </span>
-                      </div>
-                      {customerAddress && (
-                        <p className="text-sm text-muted-foreground">
-                          Address: {customerAddress}
-                        </p>
-                      )}
-                    </div>
-                    <Button
-                      onClick={() => handleMarkReady(orderId)}
-                      disabled={loadingOrders}
-                      data-testid={`button-ready-${orderId}`}
-                      className="ml-4"
-                    >
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Ready
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
