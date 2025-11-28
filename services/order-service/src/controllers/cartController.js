@@ -1,4 +1,4 @@
-const Order = require('../models/Order');
+﻿const Order = require("../models/Order");
 const {
   getOrCreateCart,
   addItemToCart,
@@ -6,20 +6,35 @@ const {
   removeCartItem,
   clearCart,
   recalcTotal,
-} = require('../services/cartService');
-const { getIO } = require('../socket');
-const { AppError } = require('../utils/appError');
+} = require("../services/cartService");
+const { getIO } = require("../socket");
+const { AppError } = require("../utils/appError");
 
-const paymentMethods = ['cod', 'vnpay', 'momo', 'card'];
+const paymentMethods = ["cod", "vnpay", "momo", "card"];
+const DEFAULT_LAT = Number(process.env.DEFAULT_CUSTOMER_LAT || 10.762622);
+const DEFAULT_LNG = Number(process.env.DEFAULT_CUSTOMER_LNG || 106.660172);
+const REST_LAT = Number(process.env.DEFAULT_RESTAURANT_LAT || 10.775658);
+const REST_LNG = Number(process.env.DEFAULT_RESTAURANT_LNG || 106.700424);
+
+const randomNearby = (lat, lng) => {
+  const delta = 0.01; // ~1km radius
+  return {
+    lat: lat + (Math.random() - 0.5) * delta,
+    lng: lng + (Math.random() - 0.5) * delta,
+  };
+};
+
+const makePinFromPhone = (phone) => {
+  const digits = String(phone || "").replace(/\D/g, "");
+  return digits.slice(-4).padStart(4, "0");
+};
 
 exports.getCart = async (req, res, next) => {
   try {
     const customer_id = req.user.id;
     const { restaurant_id } = req.query;
     if (!restaurant_id) {
-      return res
-        .status(400)
-        .json({ message: 'restaurant_id is required' });
+      return res.status(400).json({ message: "restaurant_id is required" });
     }
     const cart = await getOrCreateCart(customer_id, restaurant_id);
     res.json(cart);
@@ -34,7 +49,7 @@ exports.addItem = async (req, res, next) => {
     const { restaurant_id, productId, quantity, notes } = req.body;
     if (!restaurant_id || !productId) {
       return res.status(400).json({
-        message: 'restaurant_id and productId are required',
+        message: "restaurant_id and productId are required",
       });
     }
 
@@ -57,9 +72,7 @@ exports.updateItem = async (req, res, next) => {
     const { restaurant_id, quantity, notes } = req.body;
     const { itemId } = req.params;
     if (!restaurant_id) {
-      return res
-        .status(400)
-        .json({ message: 'restaurant_id is required' });
+      return res.status(400).json({ message: "restaurant_id is required" });
     }
 
     const cart = await updateCartItem({
@@ -81,9 +94,7 @@ exports.removeItem = async (req, res, next) => {
     const { restaurant_id } = { ...req.query, ...req.body };
     const { itemId } = req.params;
     if (!restaurant_id) {
-      return res
-        .status(400)
-        .json({ message: 'restaurant_id is required' });
+      return res.status(400).json({ message: "restaurant_id is required" });
     }
 
     const cart = await removeCartItem({
@@ -102,12 +113,10 @@ exports.clearCart = async (req, res, next) => {
     const customer_id = req.user.id;
     const { restaurant_id } = req.body;
     if (!restaurant_id) {
-      return res
-        .status(400)
-        .json({ message: 'restaurant_id is required' });
+      return res.status(400).json({ message: "restaurant_id is required" });
     }
     const cart = await clearCart({ customer_id, restaurant_id });
-    res.json(cart || { message: 'No active cart' });
+    res.json(cart || { message: "No active cart" });
   } catch (e) {
     next(e);
   }
@@ -116,49 +125,62 @@ exports.clearCart = async (req, res, next) => {
 exports.checkout = async (req, res, next) => {
   try {
     const customer_id = req.user.id;
-    const { restaurant_id, long_address, payment_method } = req.body;
+    const { restaurant_id, long_address, payment_method, delivery_phone, delivery_location } = req.body;
     if (!restaurant_id || !payment_method) {
       return res.status(400).json({
-        message: 'restaurant_id and payment_method are required',
+        message: "restaurant_id and payment_method are required",
       });
     }
     if (!paymentMethods.includes(payment_method)) {
-      throw AppError.badRequest('payment_method is invalid');
+      throw AppError.badRequest("payment_method is invalid");
     }
-    if (long_address !== undefined && typeof long_address !== 'string') {
-      throw AppError.badRequest('long_address must be a string');
+    if (long_address !== undefined && typeof long_address !== "string") {
+      throw AppError.badRequest("long_address must be a string");
+    }
+    if (!delivery_phone) {
+      throw AppError.badRequest("delivery_phone is required");
+    }
+    const digits = String(delivery_phone).replace(/\D/g, "");
+    if (digits.length !== 10) {
+      throw AppError.badRequest("delivery_phone must be 10 digits");
     }
 
     const order = await Order.findOne({
       customer_id,
       restaurant_id,
-      status: 'cart',
+      status: "cart",
     });
     if (!order || order.items.length === 0) {
-      return res.status(400).json({ message: 'Cart is empty' });
+      return res.status(400).json({ message: "Cart is empty" });
     }
     if (order.expires_at && order.expires_at < new Date()) {
-      order.status = 'expired';
+      order.status = "expired";
       order.updated_at = new Date();
       await order.save();
-      throw AppError.badRequest('Cart expired, please start a new cart');
+      throw AppError.badRequest("Cart expired, please start a new cart");
     }
 
     recalcTotal(order);
     order.long_address = long_address;
     order.payment_method = payment_method;
-    order.status = 'submitted';
+    order.delivery_phone = digits;
+    order.pin_code = makePinFromPhone(digits);
+    order.status = "submitted";
     order.payment_status =
-      payment_method === 'cod' ? 'unpaid' : 'pending';
+      payment_method === "cod" ? "unpaid" : "pending";
     order.submitted_at = new Date();
     order.updated_at = new Date();
+    order.delivery_location =
+      (delivery_location && delivery_location.lat && delivery_location.lng && delivery_location) ||
+      randomNearby(DEFAULT_LAT, DEFAULT_LNG);
+    order.restaurant_location = { lat: REST_LAT, lng: REST_LNG };
     await order.save();
 
     // Broadcast to customer and restaurant listeners
     const io = getIO();
     if (io) {
-      io.to(`customer-${order.customer_id}`).emit('order:update', order);
-      io.to(`restaurant-${order.restaurant_id}`).emit('order:update', order);
+      io.to(`customer-${order.customer_id}`).emit("order:update", order);
+      io.to(`restaurant-${order.restaurant_id}`).emit("order:update", order);
     }
 
     // Optional: integrate with PAYMENT_SERVICE_URL here for non-COD
@@ -174,23 +196,19 @@ exports.updateAddress = async (req, res, next) => {
     const customer_id = req.user.id;
     const { restaurant_id, long_address } = req.body;
     if (!restaurant_id) {
-      return res
-        .status(400)
-        .json({ message: 'restaurant_id is required' });
+      return res.status(400).json({ message: "restaurant_id is required" });
     }
-    if (!long_address || typeof long_address !== 'string') {
-      return res
-        .status(400)
-        .json({ message: 'long_address is required' });
+    if (!long_address || typeof long_address !== "string") {
+      return res.status(400).json({ message: "long_address is required" });
     }
 
     const order = await Order.findOne({
       customer_id,
       restaurant_id,
-      status: 'cart',
+      status: "cart",
     });
     if (!order) {
-      return res.status(404).json({ message: 'Cart not found' });
+      return res.status(404).json({ message: "Cart not found" });
     }
     order.long_address = long_address;
     order.updated_at = new Date();
@@ -201,4 +219,3 @@ exports.updateAddress = async (req, res, next) => {
     next(e);
   }
 };
-

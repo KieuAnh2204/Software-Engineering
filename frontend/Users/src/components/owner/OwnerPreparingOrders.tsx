@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Clock, RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { formatCurrency } from "@/utils/formatCurrency";
 
 type OrderItem = {
   name?: string;
@@ -47,9 +48,6 @@ export default function OwnerPreparingOrders() {
     localStorage.getItem("restaurantId") ||
     "";
 
-  const formatVND = (value?: number) =>
-    `${(value || 0).toLocaleString("vi-VN")} ₫`;
-
   const fetchOrders = useCallback(async () => {
     if (!orderBaseUrl) return;
     if (!restaurantId) {
@@ -63,7 +61,7 @@ export default function OwnerPreparingOrders() {
     try {
       setLoading(true);
       const res = await axios.get(
-        `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=preparing`,
+        `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=ready_for_delivery`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -85,19 +83,19 @@ export default function OwnerPreparingOrders() {
     fetchOrders();
   }, [fetchOrders, restaurantId]);
 
-  const handleMarkReady = async (orderId: string) => {
+  const handleStartDelivering = async (orderId: string) => {
     if (!orderBaseUrl || !restaurantId) return;
     try {
       await axios.patch(
         `${orderBaseUrl}/${orderId}/status`,
-        { status: "ready_for_pickup", restaurant_id: restaurantId },
+        { status: "delivering", restaurant_id: restaurantId },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
       await fetchOrders();
-      toast({ title: "Order marked ready for pickup" });
+      toast({ title: "Order is now being delivered" });
     } catch (err) {
       console.error("Error updating order:", err);
       toast({
@@ -110,7 +108,8 @@ export default function OwnerPreparingOrders() {
   const ordersToRender =
     orders.filter(
       (order) =>
-        order.status === "preparing" && order.payment_status === "paid"
+        order.status === "ready_for_delivery" &&
+        order.payment_status === "paid"
     ) || [];
 
   if (loading) {
@@ -126,9 +125,9 @@ export default function OwnerPreparingOrders() {
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16">
           <Clock className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">No Preparing Orders</h3>
+          <h3 className="text-lg font-medium mb-2">No Ready Orders</h3>
           <p className="text-sm text-muted-foreground">
-            Orders will appear here once they move to preparing.
+            Orders ready for delivery will appear here
           </p>
           <Button
             variant="outline"
@@ -148,7 +147,7 @@ export default function OwnerPreparingOrders() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Preparing Orders</h2>
+        <h2 className="text-xl font-semibold">Ready Orders</h2>
         <Button
           variant="outline"
           size="sm"
@@ -187,8 +186,8 @@ export default function OwnerPreparingOrders() {
                 <div className="space-y-1">
                   <CardTitle className="text-lg">{dishName}</CardTitle>
                   <div className="flex items-center gap-2">
-                    <Badge variant="default" data-testid={`badge-status-${orderId}`}>
-                      Preparing / Paid
+                    <Badge variant="secondary" data-testid={`badge-status-${orderId}`}>
+                      Ready for Delivery
                     </Badge>
                     <span className="text-sm text-muted-foreground">
                       {orderedTime
@@ -198,12 +197,13 @@ export default function OwnerPreparingOrders() {
                   </div>
                 </div>
                 <Button
-                  onClick={() => handleMarkReady(orderId)}
+                  onClick={() => handleStartDelivering(orderId)}
                   disabled={loading}
                   data-testid={`button-ready-${orderId}`}
+                  className="bg-green-600 hover:bg-green-700"
                 >
                   <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Ready
+                  Start Delivering
                 </Button>
               </div>
             </CardHeader>
@@ -223,7 +223,7 @@ export default function OwnerPreparingOrders() {
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span>Quantity: {quantity}</span>
                     <span className="font-medium text-foreground">
-                      Total: {formatVND(totalAmount)}
+                      Total: {formatCurrency(totalAmount)}
                     </span>
                   </div>
                 </div>

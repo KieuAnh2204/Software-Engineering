@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { useCart, getLastCartRestaurantId } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
 import axios from "axios";
 import { useAuth } from "@/hooks/useAuth";
+import { formatCurrency } from "@/utils/formatCurrency";
 
 const ORDER_API = import.meta.env?.VITE_ORDER_API ?? "http://localhost:3002/api/orders";
 const PAYMENT_API = import.meta.env?.VITE_PAYMENT_API ?? "http://localhost:3004/api/payments";
@@ -24,6 +25,7 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("vnpay");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryNote, setDeliveryNote] = useState("");
+  const [deliveryPhone, setDeliveryPhone] = useState("");
   const { cart, getCart, isLoading } = useCart();
   const { toast } = useToast();
   const { isAuthenticated, user } = useAuth();
@@ -45,22 +47,21 @@ export default function Checkout() {
   }, [cart, restaurantId, getCart, toast]);
 
   useEffect(() => {
-    const fetchAddress = async () => {
+    const fetchProfile = async () => {
       if (!isAuthenticated) return;
       try {
         const token = localStorage.getItem("token");
         const res = await axios.get("http://localhost:3001/api/auth/customers/me", {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
-        const addr = res.data?.data?.customer?.address;
-        if (addr) {
-          setDeliveryAddress(addr);
-        }
+        const customer = res.data?.data?.customer;
+        if (customer?.address) setDeliveryAddress(customer.address);
+        if (customer?.phone) setDeliveryPhone(customer.phone);
       } catch (error) {
-        console.error("Failed to load user address", error);
+        console.error("Failed to load user profile", error);
       }
     };
-    fetchAddress();
+    fetchProfile();
   }, [isAuthenticated]);
 
   const deliveryFee = 25000; // static placeholder (VND)
@@ -71,8 +72,6 @@ export default function Checkout() {
   }, [cart]);
 
   const total = subtotal + deliveryFee + serviceFee;
-
-  const formatVND = (value: number) => `${value.toLocaleString("vi-VN")} ₫`;
 
   const getAuthHeader = () => {
     const token = localStorage.getItem("token");
@@ -136,6 +135,15 @@ export default function Checkout() {
       });
       return;
     }
+    const digits = deliveryPhone.replace(/\D/g, "");
+    if (digits.length !== 10) {
+      toast({
+        title: "Phone required",
+        description: "Delivery phone must be 10 digits.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       // 1) Submit cart to order-service
       const orderRes = await axios.post(
@@ -144,6 +152,8 @@ export default function Checkout() {
           restaurant_id: restaurantId,
           payment_method: paymentMethod,
           long_address: deliveryAddress,
+          instruction: deliveryNote,
+          delivery_phone: digits,
         },
         { headers: getAuthHeader() }
       );
@@ -190,9 +200,19 @@ export default function Checkout() {
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Delivery Address</CardTitle>
+                <CardTitle>Delivery Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Delivery phone number (required)</Label>
+                  <Input
+                    id="phone"
+                    value={deliveryPhone}
+                    onChange={(e) => setDeliveryPhone(e.target.value)}
+                    placeholder="0988123456"
+                    data-testid="input-phone"
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="address">Address</Label>
                   <Input
@@ -269,21 +289,21 @@ export default function Checkout() {
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span className="font-medium">{formatVND(subtotal)}</span>
+                    <span className="font-medium">{formatCurrency(subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Delivery fee</span>
-                    <span className="font-medium">{formatVND(deliveryFee)}</span>
+                    <span className="font-medium">{formatCurrency(deliveryFee)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Service fee</span>
-                    <span className="font-medium">{formatVND(serviceFee)}</span>
+                    <span className="font-medium">{formatCurrency(serviceFee)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-lg">
                     <span className="font-bold">Total</span>
                     <span className="font-bold text-primary">
-                      {formatVND(total)}
+                      {formatCurrency(total)}
                     </span>
                   </div>
                 </div>

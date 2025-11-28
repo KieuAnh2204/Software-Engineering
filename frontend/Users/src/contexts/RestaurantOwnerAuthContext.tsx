@@ -8,6 +8,7 @@ import {
 import { getOwnerMe, loginOwner, registerOwner } from "@/api/auth";
 import { clearToken, getToken, setToken } from "@/api/client";
 import { jwtDecode } from "jwt-decode";
+import { getOwnerRestaurants } from "@/api/ownerApi";
 
 interface RestaurantOwner {
   id: string;
@@ -50,7 +51,7 @@ export function RestaurantOwnerAuthProvider({ children }: { children: ReactNode 
     }
   };
 
-  const syncOwnerState = (payload: any, fallbackUsername?: string) => {
+  const syncOwnerState = async (payload: any, fallbackUsername?: string) => {
     const ownerPayload = payload?.owner || payload;
     const userPayload = payload?.user || payload;
     const mapped: RestaurantOwner = {
@@ -65,6 +66,22 @@ export function RestaurantOwnerAuthProvider({ children }: { children: ReactNode 
       role: "restaurant_owner",
     };
     setOwner(mapped);
+
+    // Fetch and store restaurant_id
+    const ownerId = ownerPayload?.owner_id || ownerPayload?._id;
+    if (ownerId) {
+      try {
+        const restaurantResponse = await getOwnerRestaurants(ownerId);
+        if (restaurantResponse.data?.restaurants?.[0]?._id) {
+          const restaurantId = restaurantResponse.data.restaurants[0]._id;
+          localStorage.setItem("restaurant_id", restaurantId);
+          localStorage.setItem("owner_restaurant_id", restaurantId);
+          localStorage.setItem("restaurantId", restaurantId);
+        }
+      } catch (error) {
+        console.error("Failed to fetch restaurant:", error);
+      }
+    }
   };
 
   const ownerLogin = async (username: string, password: string) => {
@@ -103,6 +120,9 @@ export function RestaurantOwnerAuthProvider({ children }: { children: ReactNode 
     clearToken({ owner: true });
     localStorage.removeItem("owner_token");
     localStorage.removeItem("owner_id");
+    localStorage.removeItem("restaurant_id");
+    localStorage.removeItem("owner_restaurant_id");
+    localStorage.removeItem("restaurantId");
     setOwner(null);
   };
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Clock, RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { formatCurrency } from "@/utils/formatCurrency";
 
 type OrderItem = {
   name?: string;
@@ -45,9 +46,6 @@ export default function OwnerPendingOrders() {
     localStorage.getItem("restaurantId") ||
     "";
 
-  const formatVND = (value?: number) =>
-    `${(value || 0).toLocaleString("vi-VN")} ₫`;
-
   const fetchOrders = useCallback(async () => {
     if (!orderBaseUrl) return;
     if (!restaurantId) {
@@ -60,14 +58,22 @@ export default function OwnerPendingOrders() {
     }
     try {
       setLoading(true);
-      const res = await axios.get(
-        `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=confirmed`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      // Fetch both confirmed and preparing orders
+      const [confirmedRes, preparingRes] = await Promise.all([
+        axios.get(
+          `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=confirmed`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        ),
+        axios.get(
+          `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=preparing`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+      ]);
 
-      setOrders(res.data?.data || res.data?.items || []);
+      const confirmedOrders = confirmedRes.data?.data || confirmedRes.data?.items || [];
+      const preparingOrders = preparingRes.data?.data || preparingRes.data?.items || [];
+      
+      setOrders([...confirmedOrders, ...preparingOrders]);
     } catch (err) {
       console.error("Error loading orders:", err);
       toast({
@@ -77,7 +83,7 @@ export default function OwnerPendingOrders() {
     } finally {
       setLoading(false);
     }
-  }, [orderBaseUrl, token, toast]);
+  }, [orderBaseUrl, token, toast, restaurantId]);
 
   useEffect(() => {
     fetchOrders();
@@ -95,7 +101,7 @@ export default function OwnerPendingOrders() {
       );
 
       await fetchOrders();
-      toast({ title: "Order moved to preparing" });
+      toast({ title: "Order moved to ready for delivery" });
     } catch (err) {
       console.error("Error updating order:", err);
       toast({
@@ -105,12 +111,12 @@ export default function OwnerPendingOrders() {
     }
   };
 
-  const pendingOrders =
+  const ordersToRender =
     orders.filter(
       (order) =>
-        order.status === "confirmed" && order.payment_status === "paid"
+        (order.status === "confirmed" || order.status === "preparing") && 
+        order.payment_status === "paid"
     ) || [];
-  const ordersToRender = pendingOrders;
 
   if (loading) {
     return (
@@ -176,11 +182,11 @@ export default function OwnerPendingOrders() {
                 <div className="space-y-1">
                   <CardTitle className="text-lg">{dishName}</CardTitle>
                   <div className="flex items-center gap-2">
-                    <Badge
-                      variant="default"
+                    <Badge 
+                      variant={order.status === "preparing" ? "secondary" : "default"}
                       data-testid={`badge-status-${orderId}`}
                     >
-                      Confirmed / Paid
+                      {order.status === "preparing" ? "Preparing / Paid" : "Confirmed / Paid"}
                     </Badge>
                     <span className="text-sm text-muted-foreground">
                       {orderedTime
@@ -191,14 +197,14 @@ export default function OwnerPendingOrders() {
                 </div>
                 <Button
                   onClick={() => handleMarkReady(orderId)}
-                  disabled={loading}
+                  disabled={loading || order.status === "preparing"}
                   data-testid={`button-ready-${orderId}`}
                 >
                   <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Start Preparing
+                  {order.status === "preparing" ? "Preparing..." : "Start Preparing"}
                 </Button>
               </div>
-          </CardHeader>
+            </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
@@ -216,9 +222,9 @@ export default function OwnerPendingOrders() {
                 <p className="text-sm font-medium mb-1">Order Details</p>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                   <span>Quantity: {quantity}</span>
-                  <span className="font-medium text-foreground">
-                    Total: {formatVND(totalAmount)}
-                  </span>
+                    <span className="font-medium text-foreground">
+                    Total: {formatCurrency(totalAmount)}
+                    </span>
                 </div>
               </div>
             </div>

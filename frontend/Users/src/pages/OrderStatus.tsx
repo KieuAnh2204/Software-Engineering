@@ -5,8 +5,9 @@ import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, RefreshCcw } from "lucide-react";
+import { ArrowLeft, RefreshCcw, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/utils/formatCurrency";
 
 const ORDER_API = import.meta.env?.VITE_ORDER_API ?? "http://localhost:3002/api/orders";
 
@@ -28,6 +29,8 @@ type Order = {
   total_amount: number;
   items: OrderItem[];
   updated_at?: string;
+  assigned_drone?: string;
+  pin_code?: string;
 };
 
 export default function OrderStatus() {
@@ -37,11 +40,16 @@ export default function OrderStatus() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const formatVND = (v: number) => `${v.toLocaleString("vi-VN")} ₫`;
-
   const statusLabel = useMemo(() => {
     if (!order) return "";
-    return `${order.status} / ${order.payment_status}`;
+    const mapping: Record<string, string> = {
+      preparing: "Preparing",
+      ready_for_delivery: "Drone on the way",
+      delivering: "Delivering",
+      arrived: "Arrived",
+      completed: "Completed",
+    };
+    return `${mapping[order.status] || order.status} / ${order.payment_status}`;
   }, [order]);
 
   const getAuthHeader = () => {
@@ -73,7 +81,6 @@ export default function OrderStatus() {
     fetchOrder();
     const id = setInterval(fetchOrder, 5000);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
   if (!orderId) {
@@ -126,7 +133,9 @@ export default function OrderStatus() {
 
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Delivery address</p>
-              <p className="font-medium">{order?.long_address || "Not set"}</p>
+              <p className="font-medium flex items-center gap-2">
+                <MapPin className="h-4 w-4" /> {order?.long_address || "Not set"}
+              </p>
             </div>
 
             <Separator />
@@ -139,7 +148,7 @@ export default function OrderStatus() {
                     <span>
                       {item.name} x {item.quantity}
                     </span>
-                    <span className="font-medium">{formatVND(item.price * item.quantity)}</span>
+                    <span className="font-medium">{formatCurrency(item.price * item.quantity)}</span>
                   </div>
                 ))}
               </div>
@@ -149,8 +158,24 @@ export default function OrderStatus() {
 
             <div className="flex justify-between text-lg">
               <span className="font-bold">Total</span>
-              <span className="font-bold text-primary">{formatVND(order?.total_amount || 0)}</span>
+              <span className="font-bold text-primary">{formatCurrency(order?.total_amount || 0)}</span>
             </div>
+
+            {["confirmed", "preparing", "ready_for_delivery", "delivering", "arrived"].includes(order?.status || "") && (
+              <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                <Button asChild variant="secondary">
+                  <Link href={`/order/${orderId}/track`}>Track delivery</Link>
+                </Button>
+                {(order?.status === "arrived" || order?.status === "delivering") && (
+                  <Button asChild className="bg-green-600 hover:bg-green-700">
+                    <Link href={`/order/${orderId}/pin`}>Open PIN screen</Link>
+                  </Button>
+                )}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Drone sẽ yêu cầu bạn nhập 4 số cuối khi đến nơi. PIN: {order?.pin_code || "****"}
+            </p>
           </CardContent>
         </Card>
       </main>

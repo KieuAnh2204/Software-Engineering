@@ -90,6 +90,22 @@ services:
     networks:
       - app-network
 
+  drone-service:
+    build:
+      context: ./services/drone-service
+      dockerfile: Dockerfile
+    container_name: drone-service
+    restart: unless-stopped
+    ports:
+      - "3006:3006"
+    environment:
+      - NODE_ENV=development
+      - PORT=3006
+      - MONGODB_URI=mongodb+srv://foodfast_delivery:foodfast_delivery@cluster0.r3lhqwd.mongodb.net/drone_service?retryWrites=true&w=majority&appName=Cluster0
+      - ORDER_SERVICE_URL=http://order-service:3002
+    networks:
+      - app-network
+
   frontend:
     image: node:20
     container_name: frontend

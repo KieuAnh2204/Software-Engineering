@@ -7,6 +7,7 @@ const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const connectDB = require('./config/database');
 const orderRoutes = require('./routes/orderRoutes');
+const orderController = require('./controllers/orderController');
 const errorHandler = require('./middleware/errorHandler');
 const { setIO } = require('./socket');
 
@@ -36,6 +37,10 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', service: 'order-service' });
 });
+
+// Drone PIN alias (public)
+app.post('/api/drones/:orderId/verify-pin', orderController.verifyPin);
+app.get('/api/drones/:orderId/status', orderController.getOrderPublic);
 
 // Routes
 app.use('/api/orders', orderRoutes);

@@ -1,4 +1,12 @@
-const mongoose = require('mongoose');
+﻿const mongoose = require("mongoose");
+
+const LocationSchema = new mongoose.Schema(
+  {
+    lat: { type: Number, required: true },
+    lng: { type: Number, required: true },
+  },
+  { _id: false }
+);
 
 const OrderItemSchema = new mongoose.Schema(
   {
@@ -20,31 +28,32 @@ const OrderSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: [
-        'cart',
-        'submitted',
-        'payment_pending',
-        'payment_failed',
-        'confirmed',
-        'preparing',
-        'ready_for_pickup',
-        'delivering',
-        'completed',
-        'cancelled',
-        'expired',
+        "cart",
+        "submitted",
+        "payment_pending",
+        "payment_failed",
+        "confirmed",
+        "preparing",
+        "ready_for_delivery",
+        "delivering",
+        "arrived",
+        "completed",
+        "cancelled",
+        "expired",
       ],
-      default: 'cart',
+      default: "cart",
       index: true,
     },
 
     payment_status: {
       type: String,
-      enum: ['unpaid', 'pending', 'paid', 'refunded'],
-      default: 'unpaid',
+      enum: ["unpaid", "pending", "paid", "refunded"],
+      default: "unpaid",
     },
 
     payment_method: {
       type: String,
-      enum: ['cod', 'vnpay', 'momo', 'card'],
+      enum: ["cod", "vnpay", "momo", "card"],
     },
 
     items: { type: [OrderItemSchema], default: [] },
@@ -54,6 +63,13 @@ const OrderSchema = new mongoose.Schema(
 
     // Address as a single string
     long_address: { type: String },
+
+    delivery_phone: { type: String },
+    pin_code: { type: String },
+    arrival_confirmed: { type: Boolean, default: false },
+    assigned_drone: { type: String },
+    restaurant_location: LocationSchema,
+    delivery_location: LocationSchema,
 
     // Explicit timestamps
     created_at: { type: Date, default: Date.now },
@@ -72,5 +88,4 @@ const OrderSchema = new mongoose.Schema(
 
 OrderSchema.index({ customer_id: 1, restaurant_id: 1, status: 1 });
 
-module.exports = mongoose.model('Order', OrderSchema);
-
+module.exports = mongoose.model("Order", OrderSchema);
