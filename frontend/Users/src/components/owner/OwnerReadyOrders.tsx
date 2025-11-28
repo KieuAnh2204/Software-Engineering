@@ -61,7 +61,7 @@ export default function OwnerReadyOrders() {
     try {
       setLoading(true);
       const res = await axios.get(
-        `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=ready_for_pickup`,
+        `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=ready_for_delivery`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -108,7 +108,7 @@ export default function OwnerReadyOrders() {
   const readyOrders =
     orders.filter(
       (order) =>
-        order.status === "ready_for_pickup" &&
+        order.status === "ready_for_delivery" &&
         order.payment_status === "paid"
     ) || [];
   const ordersToRender = readyOrders;
@@ -190,7 +190,7 @@ export default function OwnerReadyOrders() {
                       variant="default"
                       data-testid={`badge-status-${orderId}`}
                     >
-                      Ready for Pickup / Paid
+                      Ready for Delivery / Paid
                     </Badge>
                     <span className="text-sm text-muted-foreground">
                       {orderedTime
