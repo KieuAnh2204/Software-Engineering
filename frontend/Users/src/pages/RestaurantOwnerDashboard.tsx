@@ -39,7 +39,7 @@ import OwnerMenuManagement from "@/components/owner/OwnerMenuManagement";
 import OwnerPendingOrders from "@/components/owner/OwnerPendingOrders";
 import OwnerReadyOrders from "@/components/owner/OwnerReadyOrders";
 import OwnerOrderHistory from "@/components/owner/OwnerOrderHistory";
-import OwnerPreparingOrders from "@/components/owner/OwnerPreparingOrders";
+import OwnerDeliveringOrders from "@/components/owner/OwnerDeliveringOrders";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", value: "dashboard" },
@@ -48,8 +48,8 @@ const menuItems = [
 
 const orderMenuItems = [
   { icon: Clock, label: "Pending Orders", value: "pending-orders" },
-  { icon: Truck, label: "Preparing Orders", value: "preparing-orders" },
   { icon: Truck, label: "Ready Orders", value: "ready-orders" },
+  { icon: Truck, label: "Delivering Orders", value: "delivering-orders" },
   { icon: History, label: "Order History", value: "order-history" },
 ];
 
@@ -203,8 +203,8 @@ export default function RestaurantOwnerDashboard() {
               )}
               {activeView === "menu" && <OwnerMenuManagement />}
               {activeView === "pending-orders" && <OwnerPendingOrders />}
-              {activeView === "preparing-orders" && <OwnerPreparingOrders />}
               {activeView === "ready-orders" && <OwnerReadyOrders />}
+              {activeView === "delivering-orders" && <OwnerDeliveringOrders />}
               {activeView === "order-history" && <OwnerOrderHistory />}
             </main>
           </div>

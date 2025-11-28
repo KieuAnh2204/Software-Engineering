@@ -31,6 +31,8 @@ type Order = {
   created_at?: string;
 };
 
+const formatVND = (value?: number) => `${(value || 0).toLocaleString("vi-VN")} VND`;
+
 export default function OwnerPreparingOrders() {
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -46,9 +48,6 @@ export default function OwnerPreparingOrders() {
     localStorage.getItem("owner_restaurant_id") ||
     localStorage.getItem("restaurantId") ||
     "";
-
-  const formatVND = (value?: number) =>
-    `${(value || 0).toLocaleString("vi-VN")} ₫`;
 
   const fetchOrders = useCallback(async () => {
     if (!orderBaseUrl) return;
@@ -90,14 +89,14 @@ export default function OwnerPreparingOrders() {
     try {
       await axios.patch(
         `${orderBaseUrl}/${orderId}/status`,
-        { status: "ready_for_pickup", restaurant_id: restaurantId },
+        { status: "ready_for_delivery", restaurant_id: restaurantId },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
       await fetchOrders();
-      toast({ title: "Order marked ready for pickup" });
+      toast({ title: "Order marked ready for delivery" });
     } catch (err) {
       console.error("Error updating order:", err);
       toast({
@@ -110,7 +109,7 @@ export default function OwnerPreparingOrders() {
   const ordersToRender =
     orders.filter(
       (order) =>
-        order.status === "preparing" && order.payment_status === "paid"
+        order.status === "preparing" && ["paid", "pending"].includes(order.payment_status || "")
     ) || [];
 
   if (loading) {

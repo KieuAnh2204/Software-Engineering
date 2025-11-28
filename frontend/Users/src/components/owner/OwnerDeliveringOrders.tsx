@@ -3,7 +3,7 @@ import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Clock, RefreshCcw } from "lucide-react";
+import { Clock, RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useRestaurantOwnerAuth } from "@/contexts/RestaurantOwnerAuthContext";
@@ -15,10 +15,10 @@ type OrderItem = {
 };
 
 type Order = {
-  payment_status: string;
   _id?: string;
   id?: string;
   status?: string;
+  payment_status?: string;
   items?: OrderItem[];
   customer_name?: string;
   customerName?: string;
@@ -30,11 +30,12 @@ type Order = {
   quantity?: number;
   orderedAt?: string;
   created_at?: string;
+  assigned_drone_id?: string;
 };
 
 const formatVND = (value?: number) => `${(value || 0).toLocaleString("vi-VN")} VND`;
 
-export default function OwnerPendingOrders() {
+export default function OwnerDeliveringOrders() {
   const { toast } = useToast();
   const { owner, restaurantId: ctxRestaurantId } = useRestaurantOwnerAuth();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -42,7 +43,9 @@ export default function OwnerPendingOrders() {
 
   const token = localStorage.getItem("token") || "";
   const orderBaseUrl =
-    import.meta.env.VITE_ORDER_BASE_URL || import.meta.env.VITE_ORDER_API || "http://localhost:3002/api/orders";
+    import.meta.env.VITE_ORDER_BASE_URL ||
+    import.meta.env.VITE_ORDER_API ||
+    "http://localhost:3002/api/orders";
   const restaurantId =
     ctxRestaurantId ||
     localStorage.getItem("restaurant_id") ||
@@ -52,8 +55,7 @@ export default function OwnerPendingOrders() {
     "";
 
   const fetchOrders = useCallback(async () => {
-    if (!orderBaseUrl) return;
-    if (!restaurantId) {
+    if (!orderBaseUrl || !restaurantId) {
       toast({
         title: "Missing restaurant",
         description: "No restaurant id found for this owner.",
@@ -64,7 +66,7 @@ export default function OwnerPendingOrders() {
     try {
       setLoading(true);
       const res = await axios.get(
-        `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=confirmed,payment_pending,submitted,preparing`,
+        `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=delivering`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -88,34 +90,6 @@ export default function OwnerPendingOrders() {
     return () => clearInterval(interval);
   }, [fetchOrders, restaurantId]);
 
-  const handleMarkReady = async (orderId: string) => {
-    if (!orderBaseUrl || !restaurantId) return;
-    try {
-      await axios.patch(
-        `${orderBaseUrl}/${orderId}/status`,
-        { status: "ready_for_delivery", restaurant_id: restaurantId },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      // Remove from pending list so it moves to Ready tab
-      setOrders((prev) => prev.filter((o) => (o._id || o.id) !== orderId));
-      toast({ title: "Order marked ready for delivery" });
-    } catch (err) {
-      console.error("Error updating order:", err);
-      toast({
-        title: "Failed to update order status",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const ordersToRender =
-    orders.filter((order) =>
-      ["submitted", "confirmed", "payment_pending", "preparing"].includes(order.status || "")
-    ) || [];
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -124,15 +98,25 @@ export default function OwnerPendingOrders() {
     );
   }
 
-  if (ordersToRender.length === 0) {
+  if ((orders || []).length === 0) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16">
           <Clock className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">No Pending Orders</h3>
+          <h3 className="text-lg font-medium mb-2">No Delivering Orders</h3>
           <p className="text-sm text-muted-foreground">
-            All orders have been processed
+            Orders in flight will appear here.
           </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4"
+            onClick={fetchOrders}
+            data-testid="button-refresh-delivering"
+          >
+            <RefreshCcw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </CardContent>
       </Card>
     );
@@ -141,13 +125,13 @@ export default function OwnerPendingOrders() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Pending Orders</h2>
+        <h2 className="text-xl font-semibold">Delivering Orders</h2>
         <Button
           variant="outline"
           size="sm"
           onClick={fetchOrders}
           disabled={loading}
-          data-testid="button-refresh-pending"
+          data-testid="button-refresh-delivering"
           className="flex items-center gap-2"
         >
           <RefreshCcw className="h-4 w-4" />
@@ -155,7 +139,7 @@ export default function OwnerPendingOrders() {
         </Button>
       </div>
 
-      {ordersToRender.map((order) => {
+      {orders.map((order) => {
         const orderId = order._id || order.id || "";
         const totalAmount = order.total_amount || order.totalAmount || 0;
         const customerName = order.customer_name || order.customerName || "N/A";
@@ -180,11 +164,8 @@ export default function OwnerPendingOrders() {
                 <div className="space-y-1">
                   <CardTitle className="text-lg">{dishName}</CardTitle>
                   <div className="flex items-center gap-2">
-                    <Badge
-                      variant="default"
-                      data-testid={`badge-status-${orderId}`}
-                    >
-                      Pending / {order.payment_status}
+                    <Badge variant="default" data-testid={`badge-status-${orderId}`}>
+                      Delivering / Paid
                     </Badge>
                     <span className="text-sm text-muted-foreground">
                       {orderedTime
@@ -192,42 +173,44 @@ export default function OwnerPendingOrders() {
                         : "N/A"}
                     </span>
                   </div>
+                  {order.assigned_drone_id && (
+                    <p className="text-xs text-muted-foreground">
+                      Drone: {order.assigned_drone_id}
+                    </p>
+                  )}
                 </div>
-                <Button
-                  onClick={() => handleMarkReady(orderId)}
-                  disabled={loading}
-                  data-testid={`button-ready-${orderId}`}
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Ready
-                </Button>
+                <div className="flex flex-col items-end gap-2">
+                  <Button variant="secondary" disabled data-testid={`button-waiting-${orderId}`}>
+                    Waiting for customer PIN
+                  </Button>
+                </div>
               </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <p className="text-sm font-medium mb-1">Customer Information</p>
-                <p className="text-sm text-muted-foreground">
-                  {customerName}
-                </p>
-                {customerAddress && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {customerAddress}
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <p className="text-sm font-medium mb-1">Customer Information</p>
+                  <p className="text-sm text-muted-foreground">
+                    {customerName}
                   </p>
-                )}
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-1">Order Details</p>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <span>Quantity: {quantity}</span>
-                  <span className="font-medium text-foreground">
-                    Total: {formatVND(totalAmount)}
-                  </span>
+                  {customerAddress && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {customerAddress}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-1">Order Details</p>
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <span>Quantity: {quantity}</span>
+                    <span className="font-medium text-foreground">
+                      Total: {formatVND(totalAmount)}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
         );
       })}
     </div>

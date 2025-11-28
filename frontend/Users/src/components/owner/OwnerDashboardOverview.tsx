@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { isSameDay } from "date-fns";
+import { useRestaurantOwnerAuth } from "@/contexts/RestaurantOwnerAuthContext";
 
 const TOTAL_ORDER_STATUSES = ["confirmed", "preparing", "ready_for_pickup", "completed"] as const;
 const PENDING_STATUSES = ["pending", "payment_pending", "submitted"] as const;
@@ -82,6 +83,7 @@ export default function OwnerDashboardOverview({
 }: {
   onNavigate?: (view: string) => void;
 }) {
+  const { restaurantId: ctxRestaurantId } = useRestaurantOwnerAuth();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(true);
   const [stats, setStats] = useState<Stats>({
@@ -101,6 +103,7 @@ export default function OwnerDashboardOverview({
     import.meta.env.VITE_ORDER_API ||
     "http://localhost:3002/api/orders";
   const restaurantId =
+    ctxRestaurantId ||
     localStorage.getItem("restaurant_id") ||
     localStorage.getItem("owner_restaurant_id") ||
     localStorage.getItem("restaurantId") ||

@@ -16,7 +16,6 @@ import axios from "axios";
 import { useAuth } from "@/hooks/useAuth";
 
 const ORDER_API = import.meta.env?.VITE_ORDER_API ?? "http://localhost:3002/api/orders";
-const PAYMENT_API = import.meta.env?.VITE_PAYMENT_API ?? "http://localhost:3004/api/payments";
 
 type PaymentMethod = "vnpay";
 
@@ -24,9 +23,10 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("vnpay");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryNote, setDeliveryNote] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const { cart, getCart, isLoading } = useCart();
   const { toast } = useToast();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
 
   const restaurantId = cart?.restaurant_id || getLastCartRestaurantId();
@@ -72,7 +72,7 @@ export default function Checkout() {
 
   const total = subtotal + deliveryFee + serviceFee;
 
-  const formatVND = (value: number) => `${value.toLocaleString("vi-VN")} ₫`;
+  const formatVND = (value: number) => `${value.toLocaleString("vi-VN")} VND`;
 
   const getAuthHeader = () => {
     const token = localStorage.getItem("token");
@@ -136,21 +136,42 @@ export default function Checkout() {
       });
       return;
     }
+    if (!phoneNumber) {
+      toast({
+        title: "Phone number required",
+        description: "Please provide your phone number for delivery verification.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
-      // 1) Submit cart to order-service
+      const itemsPayload =
+        cart?.items?.map((item) => ({
+          productId: item.productId,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          image: item.image,
+          notes: item.notes,
+        })) || [];
+
+      // 1) Create order (direct API)
       const orderRes = await axios.post(
-        `${ORDER_API}/cart/checkout`,
+        `${ORDER_API}`,
         {
           restaurant_id: restaurantId,
+          items: itemsPayload,
+          address: deliveryAddress,
+          instruction: deliveryNote,
           payment_method: paymentMethod,
-          long_address: deliveryAddress,
+          phone_number: phoneNumber,
         },
         { headers: getAuthHeader() }
       );
       const order = orderRes.data?.order || orderRes.data;
       if (!order?._id) throw new Error("Order not created");
 
-      // 2) Temporarily mark paid/confirmed without payment-service
+      // 2) Mark paid (simulate VNPAY success) so kitchen can start
       await axios.post(
         `${ORDER_API}/${order._id}/mock-pay`,
         {},
@@ -221,6 +242,20 @@ export default function Checkout() {
                     onChange={(e) => setDeliveryNote(e.target.value)}
                     data-testid="input-delivery-note"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number (for delivery verification)</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="0988123456"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    data-testid="input-phone"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Use the recipient's phone (not your profile) — the drone will ask for the last 4 digits.
+                  </p>
                 </div>
               </CardContent>
             </Card>

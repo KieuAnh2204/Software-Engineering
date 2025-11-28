@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, History } from "lucide-react";
 import { format } from "date-fns";
+import { useRestaurantOwnerAuth } from "@/contexts/RestaurantOwnerAuthContext";
 
 type OrderItem = {
   name?: string;
@@ -26,21 +27,31 @@ type Order = {
   created_at?: string;
 };
 
+const formatVND = (value?: number) => `${(value || 0).toLocaleString("vi-VN")} VND`;
+
 export default function OwnerOrderHistory() {
+  const { owner, restaurantId: ctxRestaurantId } = useRestaurantOwnerAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
 
   const token = localStorage.getItem("token") || "";
   const orderBaseUrl =
-    import.meta.env.VITE_ORDER_BASE_URL || import.meta.env.VITE_ORDER_API;
+    import.meta.env.VITE_ORDER_BASE_URL || import.meta.env.VITE_ORDER_API || "http://localhost:3002/api/orders";
+  const restaurantId =
+    ctxRestaurantId ||
+    localStorage.getItem("restaurant_id") ||
+    localStorage.getItem("owner_restaurant_id") ||
+    localStorage.getItem("restaurantId") ||
+    owner?.id ||
+    "";
 
   useEffect(() => {
     const fetchOrders = async () => {
-      if (!orderBaseUrl) return;
+      if (!orderBaseUrl || !restaurantId) return;
       try {
         setLoading(true);
         const res = await axios.get(
-          `${orderBaseUrl}/orders?status=completed`,
+          `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=completed`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -55,7 +66,7 @@ export default function OwnerOrderHistory() {
     };
 
     fetchOrders();
-  }, [orderBaseUrl, token]);
+  }, [orderBaseUrl, restaurantId, token]);
 
   const completedOrders = useMemo(
     () =>
@@ -131,7 +142,7 @@ export default function OwnerOrderHistory() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold">${totalAmount}</p>
+                  <p className="text-lg font-bold">{formatVND(totalAmount)}</p>
                 </div>
               </div>
             </CardHeader>

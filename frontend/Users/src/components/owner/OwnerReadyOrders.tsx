@@ -3,9 +3,10 @@ import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Truck, Package, CheckCircle2, RefreshCcw } from "lucide-react";
+import { Truck, RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { useRestaurantOwnerAuth } from "@/contexts/RestaurantOwnerAuthContext";
 
 type OrderItem = {
   name?: string;
@@ -17,6 +18,7 @@ type Order = {
   _id?: string;
   id?: string;
   status?: string;
+  payment_status?: string;
   items?: OrderItem[];
   customer_name?: string;
   customerName?: string;
@@ -28,10 +30,14 @@ type Order = {
   quantity?: number;
   orderedAt?: string;
   created_at?: string;
+  assigned_drone_id?: string;
 };
+
+const formatVND = (value?: number) => `${(value || 0).toLocaleString("vi-VN")} VND`;
 
 export default function OwnerReadyOrders() {
   const { toast } = useToast();
+  const { owner, restaurantId: ctxRestaurantId } = useRestaurantOwnerAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -41,13 +47,12 @@ export default function OwnerReadyOrders() {
     import.meta.env.VITE_ORDER_API ||
     "http://localhost:3002/api/orders";
   const restaurantId =
+    ctxRestaurantId ||
     localStorage.getItem("restaurant_id") ||
     localStorage.getItem("owner_restaurant_id") ||
     localStorage.getItem("restaurantId") ||
+    owner?.id ||
     "";
-
-  const formatVND = (value?: number) =>
-    `${(value || 0).toLocaleString("vi-VN")} ₫`;
 
   const fetchOrders = useCallback(async () => {
     if (!orderBaseUrl || !restaurantId) {
@@ -77,10 +82,12 @@ export default function OwnerReadyOrders() {
     } finally {
       setLoading(false);
     }
-  }, [orderBaseUrl, token, toast]);
+  }, [orderBaseUrl, restaurantId, token, toast]);
 
   useEffect(() => {
     fetchOrders();
+    const interval = setInterval(fetchOrders, 5000);
+    return () => clearInterval(interval);
   }, [fetchOrders, restaurantId]);
 
   const handleStartDelivering = async (orderId: string) => {
@@ -88,7 +95,12 @@ export default function OwnerReadyOrders() {
     try {
       await axios.patch(
         `${orderBaseUrl}/${orderId}/status`,
-        { status: "delivering", restaurant_id: restaurantId },
+        { 
+          status: "delivering", 
+          restaurant_id: restaurantId,
+          restaurant_location: { lat: 10.7769, lng: 106.7009 },
+          customer_location: { lat: 10.8231, lng: 106.6297 }
+        },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -109,7 +121,7 @@ export default function OwnerReadyOrders() {
     orders.filter(
       (order) =>
         order.status === "ready_for_delivery" &&
-        order.payment_status === "paid"
+        ["paid", "pending"].includes(order.payment_status || "")
     ) || [];
   const ordersToRender = readyOrders;
 
@@ -198,6 +210,11 @@ export default function OwnerReadyOrders() {
                         : "N/A"}
                     </span>
                   </div>
+                  {order.assigned_drone_id && (
+                    <p className="text-xs text-muted-foreground">
+                      Drone: {order.assigned_drone_id}
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <Button
@@ -205,7 +222,6 @@ export default function OwnerReadyOrders() {
                     disabled={loading}
                     data-testid={`button-delivering-${orderId}`}
                   >
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
                     Start Delivering
                   </Button>
                 </div>

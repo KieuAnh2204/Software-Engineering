@@ -1,5 +1,17 @@
 const Order = require('../models/Order');
 const { getIO } = require('../socket');
+const axios = require('axios');
+const { recalcTotal } = require('../services/cartService');
+
+const DRONE_SERVICE_URL = process.env.DRONE_SERVICE_URL || 'http://drone-service:3006/api/drone';
+const DEFAULT_RESTAURANT_LOCATION = {
+  lat: Number(process.env.DEFAULT_RESTAURANT_LAT || 10.7769),
+  lng: Number(process.env.DEFAULT_RESTAURANT_LNG || 106.7009),
+};
+const DEFAULT_CUSTOMER_LOCATION = {
+  lat: Number(process.env.DEFAULT_CUSTOMER_LAT || 10.8231),
+  lng: Number(process.env.DEFAULT_CUSTOMER_LNG || 106.6297),
+};
 
 const PAYMENT_SECRET_HEADER = 'x-payment-signature';
 
@@ -17,11 +29,89 @@ const ORDER_STATUSES = [
   'confirmed',
   'preparing',
   'ready_for_pickup',
+  'ready_for_delivery',
   'delivering',
+  'arrived',
   'completed',
   'cancelled',
   'expired',
 ];
+
+// Create order directly (alternative to cart checkout)
+exports.createOrder = async (req, res, next) => {
+  try {
+    const customer_id = req.user.id;
+    const {
+      restaurant_id,
+      items = [],
+      address,
+      instruction,
+      payment_method,
+      phone_number,
+    } = req.body;
+
+    if (!restaurant_id) {
+      return res.status(400).json({ message: 'restaurant_id is required' });
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'items are required' });
+    }
+    if (!payment_method) {
+      return res.status(400).json({ message: 'payment_method is required' });
+    }
+    const paymentMethods = ['cod', 'vnpay', 'momo', 'card'];
+    if (!paymentMethods.includes(payment_method)) {
+      return res.status(400).json({ message: 'payment_method is invalid' });
+    }
+    if (!phone_number || typeof phone_number !== 'string') {
+      return res.status(400).json({ message: 'phone_number is required for verification' });
+    }
+    if (address !== undefined && typeof address !== 'string') {
+      return res.status(400).json({ message: 'address must be a string' });
+    }
+    if (instruction !== undefined && typeof instruction !== 'string') {
+      return res.status(400).json({ message: 'instruction must be a string' });
+    }
+
+    const order = new Order({
+      customer_id,
+      restaurant_id,
+      items: items.map((it) => ({
+        productId: it.productId,
+        name: it.name,
+        price: Number(it.price) || 0,
+        quantity: Number(it.quantity) || 1,
+        image: it.image,
+        notes: it.notes,
+      })),
+      long_address: address,
+      delivery_instruction: instruction,
+      payment_method,
+      status: payment_method === 'vnpay' ? 'payment_pending' : 'submitted',
+      payment_status: payment_method === 'cod' ? 'unpaid' : 'pending',
+      created_at: new Date(),
+      updated_at: new Date(),
+      submitted_at: new Date(),
+    });
+
+    recalcTotal(order);
+    const cleanPhone = phone_number.replace(/\D/g, '');
+    order.phone_number = phone_number;
+    order.pin_code = cleanPhone.slice(-4).padStart(4, '0');
+
+    await order.save();
+
+    const io = getIO();
+    if (io) {
+      io.to(`customer-${order.customer_id}`).emit('order:update', order);
+      io.to(`restaurant-${order.restaurant_id}`).emit('order:update', order);
+    }
+
+    res.status(201).json({ order });
+  } catch (e) {
+    next(e);
+  }
+};
 
 exports.listOrders = async (req, res, next) => {
   try {
@@ -34,6 +124,7 @@ exports.listOrders = async (req, res, next) => {
       'confirmed',
       'preparing',
       'ready_for_pickup',
+      'ready_for_delivery',
       'delivering',
       'completed',
       'cancelled',
@@ -115,9 +206,10 @@ exports.mockMarkPaid = async (req, res, next) => {
     if (
       order.status === 'submitted' ||
       order.status === 'payment_pending' ||
-      order.status === 'payment_failed'
+      order.status === 'payment_failed' ||
+      order.status === 'confirmed'
     ) {
-      order.status = 'confirmed';
+      order.status = 'preparing';
     }
     order.paid_at = new Date();
     order.updated_at = new Date();
@@ -168,8 +260,11 @@ exports.paymentCallback = async (req, res, next) => {
 
     if (normalized === 'success' || normalized === 'paid') {
       order.payment_status = 'paid';
-      if (canAutoConfirmStatuses.includes(order.status)) {
-        order.status = 'confirmed';
+      if (
+        canAutoConfirmStatuses.includes(order.status) ||
+        order.status === 'confirmed'
+      ) {
+        order.status = 'preparing';
       }
       order.paid_at = new Date();
       changed = true;
@@ -239,6 +334,7 @@ exports.listRestaurantOrders = async (req, res, next) => {
       'confirmed',
       'preparing',
       'ready_for_pickup',
+      'ready_for_delivery',
       'delivering',
       'completed',
       'cancelled',
@@ -291,7 +387,7 @@ exports.updateRestaurantStatus = async (req, res, next) => {
       return res.status(403).json({ message: 'Forbidden' });
     }
     const { orderId } = req.params;
-    const { status, restaurant_id } = req.body;
+    const { status, restaurant_id, restaurant_location, customer_location } = req.body;
     if (!status) {
       return res.status(400).json({ message: 'status is required' });
     }
@@ -299,6 +395,7 @@ exports.updateRestaurantStatus = async (req, res, next) => {
       'confirmed',
       'preparing',
       'ready_for_pickup',
+      'ready_for_delivery',
       'delivering',
       'completed',
       'cancelled',
@@ -313,8 +410,85 @@ exports.updateRestaurantStatus = async (req, res, next) => {
       return res.status(400).json({ message: 'restaurant_id mismatch' });
     }
 
+    const oldStatus = order.status;
+    const errors = [];
+
+    // Drone integration logic
+    if (status === 'ready_for_delivery' && oldStatus !== 'ready_for_delivery') {
+      try {
+        const available = await axios.get(`${DRONE_SERVICE_URL}/available`);
+        const droneList = available.data?.data || [];
+        const droneCandidate = droneList[0];
+
+        if (droneCandidate) {
+          const pickupResponse = await axios.post(`${DRONE_SERVICE_URL}/pickup`, {
+            order_id: orderId,
+            restaurant_location: restaurant_location || DEFAULT_RESTAURANT_LOCATION,
+          });
+
+          const assignedId =
+            pickupResponse.data?.data?.drone_id ||
+            pickupResponse.data?.drone_id ||
+            droneCandidate._id ||
+            droneCandidate.id;
+
+          if (assignedId) {
+            order.assigned_drone_id = assignedId;
+          } else {
+            errors.push('Drone assigned but id missing');
+          }
+        } else {
+          errors.push('No available drones, will retry later');
+        }
+      } catch (droneError) {
+        console.error('Drone service error on pickup:', droneError.message);
+        errors.push('Unable to assign drone for pickup right now');
+      }
+    }
+
+    if (status === 'delivering' && oldStatus !== 'delivering') {
+      try {
+        // If no drone assigned yet, attempt to assign now
+        if (!order.assigned_drone_id) {
+          const available = await axios.get(`${DRONE_SERVICE_URL}/available`);
+          const droneList = available.data?.data || [];
+          const droneCandidate = droneList[0];
+          if (droneCandidate) {
+            const pickupResponse = await axios.post(`${DRONE_SERVICE_URL}/pickup`, {
+              order_id: orderId,
+              restaurant_location: restaurant_location || DEFAULT_RESTAURANT_LOCATION,
+            });
+            const assignedId =
+              pickupResponse.data?.data?.drone_id ||
+              pickupResponse.data?.drone_id ||
+              droneCandidate._id ||
+              droneCandidate.id;
+            if (assignedId) {
+              order.assigned_drone_id = assignedId;
+            }
+          }
+        }
+
+        if (!order.assigned_drone_id) {
+          errors.push('Drone not assigned yet; deliver action deferred');
+        } else {
+          await axios.post(`${DRONE_SERVICE_URL}/deliver`, {
+            order_id: orderId,
+            customer_location: customer_location || DEFAULT_CUSTOMER_LOCATION,
+          });
+        }
+      } catch (droneError) {
+        console.error('Drone service error on deliver:', droneError.message);
+        errors.push('Drone could not start delivery');
+      }
+    }
+
     order.status = status;
+    if (status === 'completed') {
+      order.completed_at = new Date();
+    }
     order.updated_at = new Date();
+
     await order.save();
 
     const io = getIO();
@@ -323,7 +497,68 @@ exports.updateRestaurantStatus = async (req, res, next) => {
       io.to(`restaurant-${order.restaurant_id}`).emit('order:update', order);
     }
 
-    res.json({ order });
+    res.json({ order, warnings: errors });
+  } catch (e) {
+    next(e);
+  }
+};
+
+// Verify PIN for delivery completion
+exports.verifyPin = async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+    const { pin } = req.body;
+
+    if (!pin || pin.length !== 4) {
+      return res.status(400).json({ message: 'PIN must be 4 digits' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    if (order.status !== 'delivering' && order.status !== 'arrived') {
+      return res.status(400).json({ message: 'Order is not ready for PIN verification' });
+    }
+
+    // Verify PIN
+    if (order.pin_code !== pin) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Incorrect PIN. Please try again.' 
+      });
+    }
+
+    // PIN is correct - complete the order
+    order.status = 'completed';
+    order.completed_at = new Date();
+    order.updated_at = new Date();
+    await order.save();
+
+    // Tell drone to return to station
+    if (order.assigned_drone_id) {
+      try {
+        await axios.post(`${DRONE_SERVICE_URL}/return`, {
+          order_id: orderId,
+        });
+      } catch (droneError) {
+        console.error('Error returning drone:', droneError.message);
+      }
+    }
+
+    // Notify via socket
+    const io = getIO();
+    if (io) {
+      io.to(`customer-${order.customer_id}`).emit('order:update', order);
+      io.to(`restaurant-${order.restaurant_id}`).emit('order:update', order);
+    }
+
+    res.json({ 
+      success: true,
+      message: 'Delivery completed successfully!',
+      order 
+    });
   } catch (e) {
     next(e);
   }

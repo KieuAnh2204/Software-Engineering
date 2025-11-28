@@ -27,7 +27,9 @@ const OrderSchema = new mongoose.Schema(
         'confirmed',
         'preparing',
         'ready_for_pickup',
+        'ready_for_delivery',
         'delivering',
+        'arrived',
         'completed',
         'cancelled',
         'expired',
@@ -54,6 +56,18 @@ const OrderSchema = new mongoose.Schema(
 
     // Address as a single string
     long_address: { type: String },
+
+    // Optional delivery instruction / note
+    delivery_instruction: { type: String },
+
+    // Phone number for delivery verification
+    phone_number: { type: String },
+    
+    // PIN code (last 4 digits of phone number)
+    pin_code: { type: String },
+
+    // Drone assignment
+    assigned_drone_id: { type: String },
 
     // Explicit timestamps
     created_at: { type: Date, default: Date.now },

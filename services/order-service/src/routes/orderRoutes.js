@@ -10,6 +10,9 @@ router.post('/payment/callback', order.paymentCallback);
 
 router.use(authenticate);
 
+// direct order creation (without cart)
+router.post('/', order.createOrder);
+
 // cart
 router.get('/cart', cart.getCart);
 router.post('/cart/items', cart.addItem);
@@ -34,6 +37,9 @@ router.patch(
 // customer history
 router.get('/', order.listOrders);
 router.get('/:orderId', order.getOrder);
+
+// PIN verification for delivery
+router.post('/:orderId/verify-pin', order.verifyPin);
 
 // payment simulation (customer/admin)
 router.post('/:orderId/mock-pay', order.mockMarkPaid);

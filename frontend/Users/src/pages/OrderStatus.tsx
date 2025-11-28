@@ -5,6 +5,7 @@ import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -25,10 +26,15 @@ type Order = {
   payment_status: string;
   restaurant_id: string;
   long_address?: string;
+  delivery_instruction?: string;
   total_amount: number;
   items: OrderItem[];
   updated_at?: string;
+  pin_code?: string;
+  assigned_drone_id?: string;
 };
+
+const formatVND = (v: number) => `${v.toLocaleString("vi-VN")} VND`;
 
 export default function OrderStatus() {
   const params = useParams();
@@ -36,8 +42,6 @@ export default function OrderStatus() {
   const { toast } = useToast();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(false);
-
-  const formatVND = (v: number) => `${v.toLocaleString("vi-VN")} ₫`;
 
   const statusLabel = useMemo(() => {
     if (!order) return "";
@@ -87,6 +91,10 @@ export default function OrderStatus() {
     );
   }
 
+  const statusValue = order?.status || "";
+  const canTrack = statusValue === "delivering";
+  const canOpenPin = statusValue === "delivering" || statusValue === "completed";
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -110,11 +118,16 @@ export default function OrderStatus() {
         </div>
 
         <Card>
-          <CardContent className="p-6 space-y-3">
+          <CardContent className="p-6 space-y-4">
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-sm text-muted-foreground">Order ID</p>
                 <p className="font-mono text-sm">{order?._id}</p>
+                {order?.assigned_drone_id && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Drone: {order.assigned_drone_id}
+                  </p>
+                )}
               </div>
               <div className="text-right">
                 <p className="text-sm text-muted-foreground">Status</p>
@@ -124,9 +137,22 @@ export default function OrderStatus() {
 
             <Separator />
 
+            <div className="flex flex-wrap gap-3">
+              <Badge variant="outline">{order?.status || "..."}</Badge>
+              <Badge variant="secondary">{order?.payment_status || "..."}</Badge>
+              {order?.pin_code && <Badge variant="default">PIN: {order.pin_code}</Badge>}
+            </div>
+
+            <Separator />
+
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Delivery address</p>
               <p className="font-medium">{order?.long_address || "Not set"}</p>
+              {order?.delivery_instruction && (
+                <p className="text-sm text-muted-foreground">
+                  Note: {order.delivery_instruction}
+                </p>
+              )}
             </div>
 
             <Separator />
@@ -147,10 +173,27 @@ export default function OrderStatus() {
 
             <Separator />
 
-            <div className="flex justify-between text-lg">
-              <span className="font-bold">Total</span>
-              <span className="font-bold text-primary">{formatVND(order?.total_amount || 0)}</span>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <Button asChild variant="outline" disabled={!canTrack}>
+                  <Link href={`/track/${orderId}`}>Track delivery</Link>
+                </Button>
+                <Button
+                  asChild
+                  className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60"
+                  disabled={!canOpenPin}
+                >
+                  <Link href={`/drone/verify/${orderId}`}>Open PIN screen</Link>
+                </Button>
+              </div>
+              <div className="text-lg font-bold text-primary">
+                {formatVND(order?.total_amount || 0)}
+              </div>
             </div>
+
+            <p className="text-xs text-muted-foreground">
+              Drone will ask for the last 4 digits when it arrives. PIN: {order?.pin_code || "****"}
+            </p>
           </CardContent>
         </Card>
       </main>
