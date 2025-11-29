@@ -301,15 +301,16 @@ export class MemStorage implements IStorage {
 
   async getRevenueSummary(startDate?: Date, endDate?: Date): Promise<RevenueSummary> {
     const orders = await this.getOrders({ startDate, endDate });
+    const completedOrders = orders.filter(order => (order.status || "").toLowerCase() === "completed");
     
-    const totalRevenue = orders.reduce((sum, order) => {
+    const totalRevenue = completedOrders.reduce((sum, order) => {
       return sum + parseFloat(order.totalAmount);
     }, 0);
     
-    const averageOrderValue = orders.length > 0 ? totalRevenue / orders.length : 0;
+    const averageOrderValue = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0;
     
     const dishRevenue = new Map<string, { dishId: string; dishName: string; orderCount: number; totalRevenue: number }>();
-    orders.forEach(order => {
+    completedOrders.forEach(order => {
       const existing = dishRevenue.get(order.dishId) || {
         dishId: order.dishId,
         dishName: order.dishName,
@@ -330,7 +331,7 @@ export class MemStorage implements IStorage {
       }));
     
     const revenueByDateMap = new Map<string, { revenue: number; orderCount: number }>();
-    orders.forEach(order => {
+    completedOrders.forEach(order => {
       const dateKey = order.orderedAt.toISOString().split('T')[0];
       const existing = revenueByDateMap.get(dateKey) || { revenue: 0, orderCount: 0 };
       existing.revenue += parseFloat(order.totalAmount);
@@ -348,7 +349,7 @@ export class MemStorage implements IStorage {
     
     return {
       totalRevenue: totalRevenue.toFixed(2),
-      totalOrders: orders.length,
+      totalOrders: completedOrders.length,
       averageOrderValue: averageOrderValue.toFixed(2),
       popularDishes,
       revenueByDate,
