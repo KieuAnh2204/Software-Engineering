@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { isSameDay } from "date-fns";
 import { useRestaurantOwnerAuth } from "@/contexts/RestaurantOwnerAuthContext";
+import { formatVND } from "@/lib/currency";
 
 const TOTAL_ORDER_STATUSES = ["confirmed", "preparing", "ready_for_pickup", "completed"] as const;
 const PENDING_STATUSES = ["pending", "payment_pending", "submitted"] as const;
@@ -71,12 +72,6 @@ const parseOrderDate = (order: Order) => {
   const parsed = new Date(dateValue);
   return isNaN(parsed.getTime()) ? null : parsed;
 };
-
-const formatVND = (amount: number) =>
-  `VND ${new Intl.NumberFormat("vi-VN", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount)}`;
 
 export default function OwnerDashboardOverview({
   onNavigate,

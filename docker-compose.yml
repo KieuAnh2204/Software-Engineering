@@ -61,7 +61,7 @@ services:
       - JWT_SECRET=2ff1011a2f5e65f72b80d9a0667a942b388bab6dc4637f681118a571b07b00474
       - PRODUCT_SERVICE_URL=http://product-service:3003
       - PAYMENT_SERVICE_URL=http://payment-service:3004
-      - DRONE_SERVICE_URL=http://drone-service:3006/api/drone
+      - DRONE_SERVICE_URL=http://drone-service:3006/api/drones
       - PAYMENT_WEBHOOK_SECRET=payment-webhook-secret
     depends_on:
       - user-service
@@ -117,7 +117,7 @@ services:
     environment:
       - VITE_USER_API=http://localhost:3001/api/auth
       - VITE_PRODUCT_API=http://localhost:3003/api
-      - VITE_DRONE_API=http://localhost:3006/api
+      - VITE_DRONE_API=http://localhost:3006/api/drones
       - NODE_ENV=development
     ports:
       - "5000:5000"

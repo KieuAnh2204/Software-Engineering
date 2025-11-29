@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Clock, RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { formatVND } from "@/lib/currency";
 
 type OrderItem = {
   name?: string;
@@ -30,8 +31,6 @@ type Order = {
   orderedAt?: string;
   created_at?: string;
 };
-
-const formatVND = (value?: number) => `${(value || 0).toLocaleString("vi-VN")} VND`;
 
 export default function OwnerPreparingOrders() {
   const { toast } = useToast();

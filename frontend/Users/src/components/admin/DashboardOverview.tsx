@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Users, Store, ShoppingBag, DollarSign } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { RevenueSummary } from "@shared/schema";
+import { formatVND } from "@/lib/currency";
 import {
   LineChart,
   Line,
@@ -14,15 +15,6 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-
-const formatVND = (value?: string | number) => {
-  const amount =
-    typeof value === "string" ? parseFloat(value || "0") : value || 0;
-  return `VND ${amount.toLocaleString("vi-VN", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  })}`;
-};
 
 export default function DashboardOverview() {
   const { data: revenueSummary, isLoading: isLoadingRevenue } = useQuery<RevenueSummary>({

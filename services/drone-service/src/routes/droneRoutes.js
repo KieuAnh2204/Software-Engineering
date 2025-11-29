@@ -1,18 +1,22 @@
 const express = require('express');
 const router = express.Router();
-const droneController = require('../controllers/droneController');
+const controller = require('../controllers/droneController');
 
-// Service-to-service routes (must be before parameterized routes)
-router.get('/available', droneController.getAvailableDrones);
-router.get('/order/:orderId', droneController.getDroneByOrderId);
+// Discovery + assignment
+router.get('/nearest', controller.findNearestDrone);
+router.post('/assign', controller.assignDrone);
+router.post('/start-delivery', controller.startDelivery);
 
-// Drone action routes
-router.post('/pickup', droneController.assignPickup);
-router.post('/deliver', droneController.startDelivery);
-router.post('/return', droneController.returnToStation);
+// Simulation + status
+router.post('/update', controller.manualUpdate);
+router.get('/position/:orderId', controller.getDronePosition);
+router.get('/arrival-status/:orderId', controller.getArrivalStatus);
 
-// Admin routes
-router.get('/:id', droneController.getDroneById);
-router.get('/', droneController.getAllDrones);
+// PIN verification
+router.post('/verify-pin', controller.verifyPin);
+
+// Admin/debug
+router.get('/', controller.listDrones);
+router.get('/:id', controller.getDroneById);
 
 module.exports = router;

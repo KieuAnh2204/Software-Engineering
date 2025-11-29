@@ -2,49 +2,36 @@ const mongoose = require('mongoose');
 
 const DroneSchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true,
-    },
+    droneId: { type: String, required: true, unique: true, index: true },
+    lat: { type: Number, required: true, default: 10.8231 },
+    lng: { type: Number, required: true, default: 106.6297 },
     status: {
       type: String,
-      enum: ['available', 'pickup', 'delivering', 'returning'],
+      enum: ['available', 'pickup', 'waiting_at_restaurant', 'delivering', 'returning'],
       default: 'available',
       index: true,
     },
-    current_location: {
-      lat: { type: Number, default: 10.8231 }, // Default: HCM City
-      lng: { type: Number, default: 106.6297 },
-    },
-    battery: {
-      type: Number,
-      default: 100,
-      min: 0,
-      max: 100,
-    },
-    assigned_order: {
-      type: mongoose.Schema.Types.ObjectId, // Order ID from order-service
-      default: null,
-    },
-    arrived_at_customer: {
-      type: Boolean,
-      default: false,
-    },
-    path_history: [
-      {
-        lat: Number,
-        lng: Number,
-        timestamp: { type: Date, default: Date.now },
-      },
-    ],
+    battery: { type: Number, default: 100, min: 0, max: 100 },
+    station: { type: String, required: true, index: true },
+    targetLat: { type: Number, default: null },
+    targetLng: { type: Number, default: null },
+    speed: { type: Number, default: 18 }, // meters / second
+
+    // Assignment info
+    orderId: { type: String, index: true },
+    pinCode: { type: String },
+    restaurantLat: { type: Number },
+    restaurantLng: { type: Number },
+    customerLat: { type: Number },
+    customerLng: { type: Number },
+    arrivedAtCustomer: { type: Boolean, default: false },
+    unlocked: { type: Boolean, default: false },
+    lastUpdate: { type: Date, default: Date.now },
   },
-  {
-    timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
-  }
+  { timestamps: true }
 );
 
 DroneSchema.index({ status: 1, battery: -1 });
+DroneSchema.index({ orderId: 1 });
 
 module.exports = mongoose.model('Drone', DroneSchema);

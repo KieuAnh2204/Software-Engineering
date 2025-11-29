@@ -14,6 +14,7 @@ import { useCart, getLastCartRestaurantId } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
 import axios from "axios";
 import { useAuth } from "@/hooks/useAuth";
+import { formatVND } from "@/lib/currency";
 
 const ORDER_API = import.meta.env?.VITE_ORDER_API ?? "http://localhost:3002/api/orders";
 
@@ -71,8 +72,6 @@ export default function Checkout() {
   }, [cart]);
 
   const total = subtotal + deliveryFee + serviceFee;
-
-  const formatVND = (value: number) => `${value.toLocaleString("vi-VN")} VND`;
 
   const getAuthHeader = () => {
     const token = localStorage.getItem("token");

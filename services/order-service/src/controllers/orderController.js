@@ -3,7 +3,8 @@ const { getIO } = require('../socket');
 const axios = require('axios');
 const { recalcTotal } = require('../services/cartService');
 
-const DRONE_SERVICE_URL = process.env.DRONE_SERVICE_URL || 'http://drone-service:3006/api/drone';
+const DRONE_SERVICE_URL = process.env.DRONE_SERVICE_URL || 'http://drone-service:3006/api/drones';
+const DRONES_DISABLED = process.env.DISABLE_DRONES === 'true';
 const DEFAULT_RESTAURANT_LOCATION = {
   lat: Number(process.env.DEFAULT_RESTAURANT_LAT || 10.7769),
   lng: Number(process.env.DEFAULT_RESTAURANT_LNG || 106.7009),
@@ -11,6 +12,39 @@ const DEFAULT_RESTAURANT_LOCATION = {
 const DEFAULT_CUSTOMER_LOCATION = {
   lat: Number(process.env.DEFAULT_CUSTOMER_LAT || 10.8231),
   lng: Number(process.env.DEFAULT_CUSTOMER_LNG || 106.6297),
+};
+
+const assignDroneForOrder = async (orderId, restaurantLocation, customerLocation, pinCode) => {
+  if (DRONES_DISABLED) return { disabled: true };
+  const payload = {
+    orderId,
+    restaurantLat: restaurantLocation.lat,
+    restaurantLng: restaurantLocation.lng,
+    customerLat: customerLocation.lat,
+    customerLng: customerLocation.lng,
+    pinCode,
+  };
+  return axios.post(`${DRONE_SERVICE_URL}/assign`, payload);
+};
+
+const startDroneDelivery = async (orderId, customerLocation) => {
+  if (DRONES_DISABLED) return { disabled: true };
+  const payload = {
+    orderId,
+    customerLat: customerLocation.lat,
+    customerLng: customerLocation.lng,
+  };
+  return axios.post(`${DRONE_SERVICE_URL}/start-delivery`, payload);
+};
+
+const fetchDroneArrival = async (orderId) => {
+  if (DRONES_DISABLED) return { disabled: true };
+  return axios.get(`${DRONE_SERVICE_URL}/arrival-status/${orderId}`);
+};
+
+const verifyWithDroneService = async (orderId, pin) => {
+  if (DRONES_DISABLED) return { disabled: true };
+  return axios.post(`${DRONE_SERVICE_URL}/verify-pin`, { orderId, pin });
 };
 
 const PAYMENT_SECRET_HEADER = 'x-payment-signature';
@@ -413,72 +447,60 @@ exports.updateRestaurantStatus = async (req, res, next) => {
     const oldStatus = order.status;
     const errors = [];
 
-    // Drone integration logic
-    if (status === 'ready_for_delivery' && oldStatus !== 'ready_for_delivery') {
+    const restaurantLoc = restaurant_location || DEFAULT_RESTAURANT_LOCATION;
+    const customerLoc = customer_location || DEFAULT_CUSTOMER_LOCATION;
+
+    // Assign nearest drone when kitchen starts preparing
+    if (status === 'preparing' && oldStatus !== 'preparing' && !DRONES_DISABLED) {
       try {
-        const available = await axios.get(`${DRONE_SERVICE_URL}/available`);
-        const droneList = available.data?.data || [];
-        const droneCandidate = droneList[0];
-
-        if (droneCandidate) {
-          const pickupResponse = await axios.post(`${DRONE_SERVICE_URL}/pickup`, {
-            order_id: orderId,
-            restaurant_location: restaurant_location || DEFAULT_RESTAURANT_LOCATION,
-          });
-
-          const assignedId =
-            pickupResponse.data?.data?.drone_id ||
-            pickupResponse.data?.drone_id ||
-            droneCandidate._id ||
-            droneCandidate.id;
-
-          if (assignedId) {
-            order.assigned_drone_id = assignedId;
-          } else {
-            errors.push('Drone assigned but id missing');
-          }
+        const assignRes = await assignDroneForOrder(
+          orderId,
+          restaurantLoc,
+          customerLoc,
+          order.pin_code
+        );
+        const assignedId =
+          assignRes.data?.drone?.droneId ||
+          assignRes.data?.drone?.id ||
+          assignRes.data?.drone?._id;
+        if (assignedId) {
+          order.assigned_drone_id = assignedId;
         } else {
-          errors.push('No available drones, will retry later');
+          errors.push('Drone assigned but missing id');
         }
       } catch (droneError) {
-        console.error('Drone service error on pickup:', droneError.message);
-        errors.push('Unable to assign drone for pickup right now');
+        console.error('Drone service error on assign:', droneError.message);
+        errors.push('Unable to assign drone right now');
       }
     }
 
-    if (status === 'delivering' && oldStatus !== 'delivering') {
+    // Owner starts delivery -> send drone to customer
+    if (status === 'delivering' && oldStatus !== 'delivering' && !DRONES_DISABLED) {
       try {
-        // If no drone assigned yet, attempt to assign now
         if (!order.assigned_drone_id) {
-          const available = await axios.get(`${DRONE_SERVICE_URL}/available`);
-          const droneList = available.data?.data || [];
-          const droneCandidate = droneList[0];
-          if (droneCandidate) {
-            const pickupResponse = await axios.post(`${DRONE_SERVICE_URL}/pickup`, {
-              order_id: orderId,
-              restaurant_location: restaurant_location || DEFAULT_RESTAURANT_LOCATION,
-            });
-            const assignedId =
-              pickupResponse.data?.data?.drone_id ||
-              pickupResponse.data?.drone_id ||
-              droneCandidate._id ||
-              droneCandidate.id;
-            if (assignedId) {
-              order.assigned_drone_id = assignedId;
-            }
+          // Try to assign if not already done
+          const assignRes = await assignDroneForOrder(
+            orderId,
+            restaurantLoc,
+            customerLoc,
+            order.pin_code
+          );
+          const assignedId =
+            assignRes.data?.drone?.droneId ||
+            assignRes.data?.drone?.id ||
+            assignRes.data?.drone?._id;
+          if (assignedId) {
+            order.assigned_drone_id = assignedId;
           }
         }
 
         if (!order.assigned_drone_id) {
-          errors.push('Drone not assigned yet; deliver action deferred');
+          errors.push('No drone assigned; delivery not started');
         } else {
-          await axios.post(`${DRONE_SERVICE_URL}/deliver`, {
-            order_id: orderId,
-            customer_location: customer_location || DEFAULT_CUSTOMER_LOCATION,
-          });
+          await startDroneDelivery(orderId, customerLoc);
         }
       } catch (droneError) {
-        console.error('Drone service error on deliver:', droneError.message);
+        console.error('Drone service error on start-delivery:', droneError.message);
         errors.push('Drone could not start delivery');
       }
     }
@@ -522,30 +544,51 @@ exports.verifyPin = async (req, res, next) => {
       return res.status(400).json({ message: 'Order is not ready for PIN verification' });
     }
 
-    // Verify PIN
     if (order.pin_code !== pin) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Incorrect PIN. Please try again.' 
+        message: 'Incorrect PIN. Please try again.',
       });
     }
 
-    // PIN is correct - complete the order
+    // Ensure drone actually reached the customer
+    if (!DRONES_DISABLED) {
+      try {
+        const arrival = await fetchDroneArrival(orderId);
+        if (!arrival.data?.droneArrived) {
+          return res.status(400).json({
+            success: false,
+            message: 'Drone has not arrived yet. Please wait a moment.',
+          });
+        }
+      } catch (droneError) {
+        console.error('Arrival check failed:', droneError.message);
+        return res.status(400).json({
+          success: false,
+          message: 'Unable to verify drone arrival. Try again shortly.',
+        });
+      }
+    }
+
+    if (!DRONES_DISABLED) {
+      try {
+        await verifyWithDroneService(orderId, pin);
+      } catch (droneError) {
+        console.error('Drone PIN verification failed:', droneError.message);
+        return res.status(400).json({
+          success: false,
+          message:
+            droneError?.response?.data?.message ||
+            'Drone did not accept the PIN yet. Please retry.',
+        });
+      }
+    }
+
+    // PIN accepted - complete the order
     order.status = 'completed';
     order.completed_at = new Date();
     order.updated_at = new Date();
     await order.save();
-
-    // Tell drone to return to station
-    if (order.assigned_drone_id) {
-      try {
-        await axios.post(`${DRONE_SERVICE_URL}/return`, {
-          order_id: orderId,
-        });
-      } catch (droneError) {
-        console.error('Error returning drone:', droneError.message);
-      }
-    }
 
     // Notify via socket
     const io = getIO();
@@ -554,10 +597,10 @@ exports.verifyPin = async (req, res, next) => {
       io.to(`restaurant-${order.restaurant_id}`).emit('order:update', order);
     }
 
-    res.json({ 
+    res.json({
       success: true,
       message: 'Delivery completed successfully!',
-      order 
+      order,
     });
   } catch (e) {
     next(e);

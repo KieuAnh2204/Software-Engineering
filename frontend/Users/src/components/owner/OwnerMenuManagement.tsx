@@ -23,6 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatVND } from "@/lib/currency";
 import {
   Select,
   SelectContent,
@@ -544,7 +545,7 @@ export default function OwnerMenuManagement() {
                       {dish.name}
                     </TableCell>
                     <TableCell>{dish.category || "N/A"}</TableCell>
-                    <TableCell>{dish.price.toLocaleString()} VND</TableCell>
+                    <TableCell>{formatVND(dish.price)}</TableCell>
                     <TableCell>
                       <Badge
                         variant={dish.is_available ? "default" : "secondary"}

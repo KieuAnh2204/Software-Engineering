@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Link } from "wouter";
 import { useCart, getLastCartRestaurantId } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
+import { formatVND } from "@/lib/currency";
 
 export default function Cart() {
   const { cart, getCart, updateCartItem, removeFromCart, isLoading } = useCart();
@@ -33,8 +34,6 @@ export default function Cart() {
   const deliveryFee = 25000;
   const serviceFee = 12000;
   const total = subtotal + deliveryFee + serviceFee;
-
-  const formatVND = (value: number) => `${value.toLocaleString("vi-VN")} ₫`;
 
   const handleUpdateQuantity = async (itemId: string, currentQuantity: number, change: number) => {
     if (!restaurantId) return;

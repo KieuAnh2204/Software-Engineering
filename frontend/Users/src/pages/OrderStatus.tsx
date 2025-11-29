@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatVND } from "@/lib/currency";
 
 const ORDER_API = import.meta.env?.VITE_ORDER_API ?? "http://localhost:3002/api/orders";
 
@@ -33,8 +34,6 @@ type Order = {
   pin_code?: string;
   assigned_drone_id?: string;
 };
-
-const formatVND = (v: number) => `${v.toLocaleString("vi-VN")} VND`;
 
 export default function OrderStatus() {
   const params = useParams();
@@ -92,7 +91,7 @@ export default function OrderStatus() {
   }
 
   const statusValue = order?.status || "";
-  const canTrack = statusValue === "delivering";
+  const canTrack = ["preparing", "ready_for_delivery", "delivering"].includes(statusValue);
   const canOpenPin = statusValue === "delivering" || statusValue === "completed";
 
   return (

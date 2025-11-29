@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle, History } from "lucide-react";
 import { format } from "date-fns";
 import { useRestaurantOwnerAuth } from "@/contexts/RestaurantOwnerAuthContext";
+import { formatVND } from "@/lib/currency";
 
 type OrderItem = {
   name?: string;
@@ -26,8 +27,6 @@ type Order = {
   orderedAt?: string;
   created_at?: string;
 };
-
-const formatVND = (value?: number) => `${(value || 0).toLocaleString("vi-VN")} VND`;
 
 export default function OwnerOrderHistory() {
   const { owner, restaurantId: ctxRestaurantId } = useRestaurantOwnerAuth();

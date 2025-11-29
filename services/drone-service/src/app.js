@@ -3,54 +3,35 @@ const cors = require('cors');
 require('dotenv').config();
 const connectDB = require('./config/database');
 const droneRoutes = require('./routes/droneRoutes');
-const Drone = require('./models/Drone');
+const { seedDrones, simulateTick } = require('./controllers/droneController');
 
 const app = express();
 const PORT = process.env.PORT || 3006;
+const TICK_MS = Number(process.env.DRONE_TICK_MS || 1000);
 
 app.use(cors());
 app.use(express.json());
 
-connectDB();
+connectDB()
+  .then(seedDrones)
+  .catch((err) => console.error('Mongo init error:', err));
 
-const seedDrones = async () => {
-  try {
-    const count = await Drone.countDocuments();
-    if (count === 0) {
-      await Drone.insertMany([
-        {
-          name: 'Drone-A',
-          status: 'available',
-          current_location: { lat: 10.8231, lng: 106.6297 },
-          battery: 100,
-        },
-        {
-          name: 'Drone-B',
-          status: 'available',
-          current_location: { lat: 10.8231, lng: 106.6297 },
-          battery: 95,
-        },
-      ]);
-      console.log('Seeded 2 drones');
-    }
-  } catch (error) {
-    console.error('Error seeding drones:', error);
-  }
-};
+// Background simulation loop (runs server-side each second)
+setInterval(() => {
+  simulateTick().catch((err) => console.error('Tick error:', err.message));
+}, TICK_MS);
 
-setTimeout(seedDrones, 2000);
-
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'OK', service: 'drone-service', timestamp: new Date() });
 });
 
-app.use('/api/drone', droneRoutes);
+app.use('/api/drones', droneRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
 });
 
-app.use((err, req, res, next) => {
+app.use((err, _req, res, _next) => {
   console.error('Server error:', err);
   res.status(500).json({ success: false, message: err.message });
 });

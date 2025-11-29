@@ -7,6 +7,7 @@ import { Clock, RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useRestaurantOwnerAuth } from "@/contexts/RestaurantOwnerAuthContext";
+import { formatVND } from "@/lib/currency";
 
 type OrderItem = {
   name?: string;
@@ -32,8 +33,6 @@ type Order = {
   created_at?: string;
   assigned_drone_id?: string;
 };
-
-const formatVND = (value?: number) => `${(value || 0).toLocaleString("vi-VN")} VND`;
 
 export default function OwnerDeliveringOrders() {
   const { toast } = useToast();
