@@ -200,24 +200,40 @@ exports.assignDrone = async (req, res) => {
         message: 'orderId, restaurantLat and restaurantLng are required',
       });
     }
-
-    const drone = await selectNearestDrone(restaurantLat, restaurantLng);
-    if (!drone) {
-      return res.status(404).json({ success: false, message: 'No available drones' });
+    // Always create a new dedicated drone instance for this order instead of reusing an available one.
+    // Select nearest station to restaurant for initial spawn.
+    let chosenStation = STATIONS[0];
+    let minDist = distanceInMeters(restaurantLat, restaurantLng, chosenStation.lat, chosenStation.lng);
+    for (let i = 1; i < STATIONS.length; i++) {
+      const st = STATIONS[i];
+      const dist = distanceInMeters(restaurantLat, restaurantLng, st.lat, st.lng);
+      if (dist < minDist) {
+        minDist = dist;
+        chosenStation = st;
+      }
     }
 
-    drone.status = 'pickup';
-    drone.orderId = orderId;
-    drone.restaurantLat = Number(restaurantLat);
-    drone.restaurantLng = Number(restaurantLng);
-    drone.customerLat = customerLat ?? HCM_CENTER.lat;
-    drone.customerLng = customerLng ?? HCM_CENTER.lng;
-    drone.pinCode = pinCode || '';
-    drone.arrivedAtCustomer = false;
-    drone.unlocked = false;
-    drone.targetLat = drone.restaurantLat;
-    drone.targetLng = drone.restaurantLng;
-    drone.lastUpdate = new Date();
+    const droneId = `DRN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const drone = new Drone({
+      droneId,
+      station: chosenStation.name,
+      lat: chosenStation.lat,
+      lng: chosenStation.lng,
+      status: 'pickup',
+      orderId,
+      restaurantLat: Number(restaurantLat),
+      restaurantLng: Number(restaurantLng),
+      customerLat: customerLat ?? HCM_CENTER.lat,
+      customerLng: customerLng ?? HCM_CENTER.lng,
+      pinCode: pinCode || '',
+      targetLat: Number(restaurantLat),
+      targetLng: Number(restaurantLng),
+      arrivedAtCustomer: false,
+      unlocked: false,
+      speed: 18,
+      battery: 100,
+      lastUpdate: new Date(),
+    });
 
     await drone.save();
 

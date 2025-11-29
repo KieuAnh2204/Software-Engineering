@@ -135,6 +135,23 @@ exports.createOrder = async (req, res, next) => {
 
     await order.save();
 
+    // Auto-create & assign a fresh drone for this order immediately to avoid shared drone conflicts
+    // Uses default restaurant & customer fallback coordinates; extend later with real locations per restaurant/customer.
+    try {
+      const droneRes = await assignDroneForOrder(
+        order._id.toString(),
+        DEFAULT_RESTAURANT_LOCATION,
+        DEFAULT_CUSTOMER_LOCATION,
+        order.pin_code
+      );
+      if (droneRes?.data?.success) {
+        order.drone_assigned_at = new Date();
+      }
+    } catch (droneErr) {
+      // Do not fail order creation if drone assignment fails; front-end can retry.
+      console.error('Drone assignment failed for order', order._id.toString(), droneErr.message);
+    }
+
     const io = getIO();
     if (io) {
       io.to(`customer-${order.customer_id}`).emit('order:update', order);

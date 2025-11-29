@@ -21,8 +21,8 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3001
-      - MONGODB_URI=mongodb+srv://foodfast_delivery:foodfast_delivery@cluster0.r3lhqwd.mongodb.net/user_service?retryWrites=true&w=majority&appName=Cluster0
-      - JWT_SECRET=2ff1011a2f5e65f72b80d9a0667a942b388bab6dc4637f681118a571b07b00474
+      - MONGODB_URI=${USER_SERVICE_MONGODB_URI}
+      - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRE=7d
     networks:
       - app-network
@@ -38,8 +38,8 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3003
-      - MONGODB_URI=mongodb+srv://foodfast_delivery:foodfast_delivery@cluster0.r3lhqwd.mongodb.net/product_service?retryWrites=true&w=majority&appName=Cluster0
-      - JWT_SECRET=2ff1011a2f5e65f72b80d9a0667a942b388bab6dc4637f681118a571b07b00474
+      - MONGODB_URI=${PRODUCT_SERVICE_MONGODB_URI}
+      - JWT_SECRET=${JWT_SECRET}
       - PRODUCT_BASE_URL=http://localhost:3003
     volumes:
       - product-uploads:/app/uploads
@@ -57,8 +57,8 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3002
-      - MONGODB_URI=mongodb+srv://foodfast_delivery:foodfast_delivery@cluster0.r3lhqwd.mongodb.net/order_service?retryWrites=true&w=majority&appName=Cluster0
-      - JWT_SECRET=2ff1011a2f5e65f72b80d9a0667a942b388bab6dc4637f681118a571b07b00474
+      - MONGODB_URI=${ORDER_SERVICE_MONGODB_URI}
+      - JWT_SECRET=${JWT_SECRET}
       - PRODUCT_SERVICE_URL=http://product-service:3003
       - PAYMENT_SERVICE_URL=http://payment-service:3004
       - DRONE_SERVICE_URL=http://drone-service:3006/api/drones
@@ -80,7 +80,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3004
-      - MONGODB_URI=mongodb+srv://foodfast_delivery:foodfast_delivery@cluster0.r3lhqwd.mongodb.net/payment_service?retryWrites=true&w=majority&appName=Cluster0
+      - MONGODB_URI=${PAYMENT_SERVICE_MONGODB_URI}
       - ORDER_SERVICE_URL=http://order-service:3002
       - PAYMENT_WEBHOOK_SECRET=payment-webhook-secret
       - VNPAY_TMN_CODE=YBI06X9N
@@ -102,7 +102,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3006
-      - MONGO_URI=mongodb+srv://foodfast_delivery:foodfast_delivery@cluster0.r3lhqwd.mongodb.net/drone_service?retryWrites=true&w=majority&appName=Cluster0
+      - MONGO_URI=${DRONE_SERVICE_MONGODB_URI}
       - ORDER_SERVICE_URL=http://order-service:3002/api/orders
     networks:
       - app-network
@@ -119,6 +119,8 @@ services:
       - VITE_PRODUCT_API=http://localhost:3003/api
       - VITE_DRONE_API=http://localhost:3006/api/drones
       - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
     ports:
       - "5000:5000"
     depends_on:

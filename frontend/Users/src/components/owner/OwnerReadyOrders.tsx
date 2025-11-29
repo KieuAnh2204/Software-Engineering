@@ -3,7 +3,9 @@ import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Truck, RefreshCcw } from "lucide-react";
+import { Truck, RefreshCcw, MapPin } from "lucide-react";
+import TrackDrone from "@/components/TrackDrone";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useRestaurantOwnerAuth } from "@/contexts/RestaurantOwnerAuthContext";
@@ -39,6 +41,7 @@ export default function OwnerReadyOrders() {
   const { owner, restaurantId: ctxRestaurantId } = useRestaurantOwnerAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
+  const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
 
   const token = localStorage.getItem("token") || "";
   const orderBaseUrl =
@@ -217,6 +220,13 @@ export default function OwnerReadyOrders() {
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <Button
+                    variant="outline"
+                    onClick={() => setTrackingOrderId(orderId)}
+                    data-testid={`button-track-${orderId}`}
+                  >
+                    <MapPin className="h-4 w-4 mr-1" /> Track Drone
+                  </Button>
+                  <Button
                     onClick={() => handleStartDelivering(orderId)}
                     disabled={loading}
                     data-testid={`button-delivering-${orderId}`}
@@ -253,6 +263,16 @@ export default function OwnerReadyOrders() {
           </Card>
         );
       })}
+      <Dialog open={!!trackingOrderId} onOpenChange={(o) => !o && setTrackingOrderId(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Drone Tracking</DialogTitle>
+          </DialogHeader>
+          {trackingOrderId && (
+            <TrackDrone orderId={trackingOrderId} height={420} />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
