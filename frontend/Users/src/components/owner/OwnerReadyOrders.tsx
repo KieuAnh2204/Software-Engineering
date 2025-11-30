@@ -10,6 +10,10 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useRestaurantOwnerAuth } from "@/contexts/RestaurantOwnerAuthContext";
 import { formatVND } from "@/lib/currency";
+import { getFixedRestaurantLocation } from "@/lib/restaurantLocations";
+
+const RESTAURANT_FALLBACK = { lng: 106.7009, lat: 10.7769 };
+const CUSTOMER_FALLBACK = { lng: 106.6297, lat: 10.8231 };
 
 type OrderItem = {
   name?: string;
@@ -34,13 +38,16 @@ type Order = {
   orderedAt?: string;
   created_at?: string;
   assigned_drone_id?: string;
+  restaurant_id?: string;
+  customer_location?: { lat: number; lng: number };
 };
 
 export default function OwnerReadyOrders() {
   const { toast } = useToast();
   const { owner, restaurantId: ctxRestaurantId } = useRestaurantOwnerAuth();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
 
   const token = localStorage.getItem("token") || "";
@@ -56,8 +63,9 @@ export default function OwnerReadyOrders() {
     owner?.id ||
     "";
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (silent = false) => {
     if (!orderBaseUrl || !restaurantId) {
+      silent ? setRefreshing(false) : setLoading(false);
       toast({
         title: "Missing restaurant",
         description: "No restaurant id found for this owner.",
@@ -66,7 +74,7 @@ export default function OwnerReadyOrders() {
       return;
     }
     try {
-      setLoading(true);
+      silent ? setRefreshing(true) : setLoading(true);
       const res = await axios.get(
         `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=ready_for_delivery`,
         {
@@ -74,7 +82,30 @@ export default function OwnerReadyOrders() {
         }
       );
 
-      setOrders(res.data?.data || res.data?.items || []);
+      const items: Order[] = res.data?.data || res.data?.items || [];
+      setOrders(items);
+      // Kick off pickup leg timers so tracking doesn't restart when reopening the dialog
+      try {
+        items.forEach((o) => {
+          const id = o._id || o.id;
+          if (!id) return;
+          const key = `drone-sim-${id}-v1`;
+          const raw = localStorage.getItem(key);
+          const parsed = raw ? JSON.parse(raw) : {};
+          if (!parsed.pickupStart) {
+            parsed.pickupStart = Date.now();
+            localStorage.setItem(key, JSON.stringify(parsed));
+          }
+          if (o.customer_location) {
+            localStorage.setItem(
+              `order-customer-location-${id}`,
+              JSON.stringify(o.customer_location)
+            );
+          }
+        });
+      } catch {
+        // ignore storage issues
+      }
     } catch (err) {
       console.error("Error loading orders:", err);
       toast({
@@ -82,31 +113,49 @@ export default function OwnerReadyOrders() {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      silent ? setRefreshing(false) : setLoading(false);
     }
   }, [orderBaseUrl, restaurantId, token, toast]);
 
   useEffect(() => {
     fetchOrders();
-    const interval = setInterval(fetchOrders, 5000);
+    const interval = setInterval(() => fetchOrders(true), 5000);
     return () => clearInterval(interval);
   }, [fetchOrders, restaurantId]);
 
   const handleStartDelivering = async (orderId: string) => {
     if (!orderBaseUrl || !restaurantId) return;
+    const restaurantLoc = getFixedRestaurantLocation(restaurantId);
+    const order = orders.find((o) => (o._id || o.id) === orderId);
+    const customerLoc = order?.customer_location || CUSTOMER_FALLBACK;
     try {
       await axios.patch(
         `${orderBaseUrl}/${orderId}/status`,
         { 
           status: "delivering", 
           restaurant_id: restaurantId,
-          restaurant_location: { lat: 10.7769, lng: 106.7009 },
-          customer_location: { lat: 10.8231, lng: 106.6297 }
+          restaurant_location: { lat: restaurantLoc.lat, lng: restaurantLoc.lng },
+          customer_location: customerLoc
         },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
+
+      // Persist delivery start to keep the drone path in sync across views
+      try {
+        const key = `drone-sim-${orderId}-v1`;
+        const raw = localStorage.getItem(key);
+        const parsed = raw ? JSON.parse(raw) : {};
+        const next = {
+          ...parsed,
+          pickupDone: true,
+          deliveryStart: parsed?.deliveryStart || Date.now(),
+        };
+        localStorage.setItem(key, JSON.stringify(next));
+      } catch {
+        // ignore storage issues
+      }
 
       await fetchOrders();
       toast({ title: "Order marked as delivering" });
@@ -127,7 +176,7 @@ export default function OwnerReadyOrders() {
     ) || [];
   const ordersToRender = readyOrders;
 
-  if (loading) {
+  if (loading && ordersToRender.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">Loading orders...</p>
@@ -148,7 +197,8 @@ export default function OwnerReadyOrders() {
             variant="outline"
             size="sm"
             className="mt-4"
-            onClick={fetchOrders}
+            onClick={() => fetchOrders(false)}
+            disabled={loading || refreshing}
             data-testid="button-refresh-ready"
           >
             <RefreshCcw className="h-4 w-4 mr-2" />
@@ -166,8 +216,8 @@ export default function OwnerReadyOrders() {
         <Button
           variant="outline"
           size="sm"
-          onClick={fetchOrders}
-          disabled={loading}
+          onClick={() => fetchOrders(true)}
+          disabled={loading || refreshing}
           data-testid="button-refresh-ready"
           className="flex items-center gap-2"
         >
@@ -228,7 +278,7 @@ export default function OwnerReadyOrders() {
                   </Button>
                   <Button
                     onClick={() => handleStartDelivering(orderId)}
-                    disabled={loading}
+                    disabled={loading || refreshing}
                     data-testid={`button-delivering-${orderId}`}
                   >
                     Start Delivering
@@ -269,7 +319,26 @@ export default function OwnerReadyOrders() {
             <DialogTitle>Drone Tracking</DialogTitle>
           </DialogHeader>
           {trackingOrderId && (
-            <TrackDrone orderId={trackingOrderId} height={420} />
+            <TrackDrone
+              orderId={trackingOrderId}
+              height={420}
+              segment="pickup"
+              durationMs={10000}
+              persistKey={trackingOrderId}
+              restaurantLocation={getFixedRestaurantLocation(restaurantId)}
+              customerLocation={
+                orders.find((o) => (o._id || o.id) === trackingOrderId)?.customer_location ||
+                (() => {
+                  try {
+                    const raw = localStorage.getItem(`order-customer-location-${trackingOrderId}`);
+                    return raw ? JSON.parse(raw) : null;
+                  } catch {
+                    return null;
+                  }
+                })() ||
+                CUSTOMER_FALLBACK
+              }
+            />
           )}
         </DialogContent>
       </Dialog>

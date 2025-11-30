@@ -91,7 +91,7 @@ export default function OrderStatus() {
   }
 
   const statusValue = order?.status || "";
-  const canTrack = ["preparing", "ready_for_delivery", "delivering"].includes(statusValue);
+  const canTrack = statusValue === "delivering";
   const canOpenPin = statusValue === "delivering" || statusValue === "completed";
 
   return (

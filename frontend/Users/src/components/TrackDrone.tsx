@@ -1,23 +1,30 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 // Simulation-only component: hard-coded station, restaurant, customer.
 // Smoothly animates a drone across two legs: station->restaurant, restaurant->customer.
-// Status progression: pickup -> waiting_at_restaurant -> delivering -> arrived
+// Status progression by segment:
+//   pickup segment: pickup -> waiting_at_restaurant
+//   delivery segment: delivering -> arrived
 
 const DEFAULT_CENTER: [number, number] = [10.7769, 106.7009]; // Ho Chi Minh City
-const TICK_MS = 1000; // update interval
-const SPEED_METERS_PER_SEC = 40; // demo speed
+const TICK_MS = 400; // update interval for smoothness
 
 type LatLng = { lat: number; lng: number };
+type Segment = "pickup" | "delivery";
 
 type Props = {
   orderId: string; // still used to key simulation instance
   height?: number | string;
   onArrival?: () => void;
   onPositionChange?: (pos: Position) => void;
+  restaurantLocation?: LatLng;
+  customerLocation?: LatLng;
+  segment?: Segment;
+  durationMs?: number;
+  persistKey?: string;
 };
 
 type Position = {
@@ -30,15 +37,73 @@ type Position = {
   station?: string;
 };
 
-export default function TrackDrone({ orderId, height = 400, onArrival, onPositionChange }: Props) {
+type SegmentState = {
+  pickupStart?: number;
+  pickupDone?: boolean;
+  deliveryStart?: number;
+  deliveryDone?: boolean;
+};
+
+const STORAGE_PREFIX = "drone-sim-";
+
+const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
+
+const readPersisted = (key: string): SegmentState => {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "object" && parsed ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const writePersisted = (key: string, state: SegmentState) => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(key, JSON.stringify(state));
+  } catch {
+    // ignore quota errors
+  }
+};
+
+export default function TrackDrone({
+  orderId,
+  height = 400,
+  onArrival,
+  onPositionChange,
+  restaurantLocation,
+  customerLocation,
+  segment = "delivery",
+  durationMs = 10000,
+  persistKey,
+}: Props) {
   const [mapReady, setMapReady] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
+  const [state, setState] = useState<SegmentState>(() =>
+    readPersisted((persistKey || STORAGE_PREFIX + orderId) + "-v1")
+  );
+  const stateRef = useRef<SegmentState>(state);
+  const storageKey = (persistKey || STORAGE_PREFIX + orderId) + "-v1";
   // No backend errors surfaced in simulation mode; toast removed
 
   // Fixed coordinates (can be parameterized later)
-  const SIM_STATION = { lat: 10.8231, lng: 106.6297, name: "SaiGon-North" };
+  // Station fixed in District 10 to separate pickup leg visually from delivery leg
+  const SIM_STATION = { lat: 10.7704, lng: 106.6678, name: "District-10" };
   const SIM_RESTAURANT = { lat: 10.7769, lng: 106.7009 };
-  const SIM_CUSTOMER = { lat: 10.7805, lng: 106.6990 };
+  const SIM_CUSTOMER = { lat: 10.7805, lng: 106.699 };
+
+  const station = SIM_STATION;
+  const restaurant = useMemo(
+    () => restaurantLocation ?? SIM_RESTAURANT,
+    [restaurantLocation?.lat, restaurantLocation?.lng]
+  );
+  const customer = useMemo(
+    () => customerLocation ?? SIM_CUSTOMER,
+    [customerLocation?.lat, customerLocation?.lng]
+  );
 
   // Icons
   const blueIcon = L.icon({
@@ -73,97 +138,126 @@ export default function TrackDrone({ orderId, height = 400, onArrival, onPositio
     return null;
   };
 
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const distanceMeters = (a: LatLng, b: LatLng) => {
-    const R = 6371000;
-    const x = toRad(b.lng - a.lng) * Math.cos(toRad((a.lat + b.lat) / 2));
-    const y = toRad(b.lat - a.lat);
-    return Math.sqrt(x * x + y * y) * R;
-  };
-  const stepToward = (from: LatLng, to: LatLng, meters: number): LatLng => {
-    const dist = distanceMeters(from, to);
-    if (dist <= meters || dist === 0) return { ...to };
-    const ratio = meters / dist;
-    return {
-      lat: from.lat + (to.lat - from.lat) * ratio,
-      lng: from.lng + (to.lng - from.lng) * ratio,
-    };
+  const updateState = (next: SegmentState) => {
+    stateRef.current = next;
+    setState(next);
+    writePersisted(storageKey, next);
   };
 
-  // Initialize simulation
   useEffect(() => {
-    setPosition({
-      lat: SIM_STATION.lat,
-      lng: SIM_STATION.lng,
-      status: "pickup",
-      droneId: `SIM-${orderId}`,
-      battery: 100,
-      station: SIM_STATION.name,
-      arrivedAtCustomer: false,
-    });
+    stateRef.current = state;
+  }, [state]);
+
+  useEffect(() => {
+    const fresh = readPersisted(storageKey);
+    stateRef.current = fresh;
+    setState(fresh);
+  }, [storageKey]);
+
+  const lerpPoint = (from: LatLng, to: LatLng, t: number): LatLng => ({
+    lat: from.lat + (to.lat - from.lat) * t,
+    lng: from.lng + (to.lng - from.lng) * t,
+  });
+
+  useEffect(() => {
     setMapReady(true);
-  }, [orderId]);
+  }, []);
 
-  // Progress simulation
   useEffect(() => {
-    if (!position) return;
-    const timer = setInterval(() => {
-      setPosition((prev) => {
-        if (!prev) return prev;
-        let next = { ...prev };
-        next.battery = Math.max(0, (next.battery || 100) - 0.15);
+    const ensureStarts = (s: SegmentState, now: number): SegmentState => {
+      const next = { ...s };
+      if (segment === "pickup" && !next.pickupStart) {
+        next.pickupStart = now;
+      }
+      if (segment === "delivery") {
+        if (!next.pickupDone) next.pickupDone = true;
+        if (!next.deliveryStart) next.deliveryStart = now;
+      }
+      return next;
+    };
 
-        if (next.status === "pickup") {
-          const newPos = stepToward({ lat: next.lat, lng: next.lng }, SIM_RESTAURANT, SPEED_METERS_PER_SEC);
-            next.lat = newPos.lat; next.lng = newPos.lng;
-            if (distanceMeters(newPos, SIM_RESTAURANT) < 30) {
-              next.status = "waiting_at_restaurant";
-            }
-        } else if (next.status === "waiting_at_restaurant") {
-          next.status = "delivering"; // immediate transition for demo
-        } else if (next.status === "delivering") {
-          const newPos = stepToward({ lat: next.lat, lng: next.lng }, SIM_CUSTOMER, SPEED_METERS_PER_SEC);
-          next.lat = newPos.lat; next.lng = newPos.lng;
-          if (distanceMeters(newPos, SIM_CUSTOMER) < 30) {
-            next.status = "arrived";
-            next.arrivedAtCustomer = true;
-            if (onArrival) onArrival();
-          }
-        }
-        if (onPositionChange) onPositionChange(next);
-        return next;
-      });
-    }, TICK_MS);
+    const computePosition = (now: number) => {
+      let currentState = ensureStarts(stateRef.current, now);
+      if (currentState !== stateRef.current) {
+        updateState(currentState);
+      }
+
+      const segmentStart =
+        segment === "pickup" ? currentState.pickupStart || now : currentState.deliveryStart || now;
+      const progress = clamp01((now - segmentStart) / durationMs);
+
+      const startPoint = segment === "pickup" ? station : restaurant;
+      const endPoint = segment === "pickup" ? restaurant : customer;
+      const point = lerpPoint(startPoint, endPoint, progress);
+
+      const status =
+        segment === "pickup"
+          ? progress >= 1
+            ? "waiting_at_restaurant"
+            : "processing"
+          : progress >= 1
+            ? "arrived"
+            : "delivering";
+
+      const arrivedAtCustomer = segment === "delivery" && progress >= 1;
+
+      if (segment === "pickup" && progress >= 1 && !currentState.pickupDone) {
+        currentState = { ...currentState, pickupDone: true };
+        updateState(currentState);
+      }
+      if (segment === "delivery" && progress >= 1 && !currentState.deliveryDone) {
+        currentState = { ...currentState, deliveryDone: true };
+        updateState(currentState);
+        if (onArrival) onArrival();
+      }
+
+      const nextPosition: Position = {
+        lat: point.lat,
+        lng: point.lng,
+        status,
+        droneId: `SIM-${orderId}`,
+        battery: Math.max(5, 100 - progress * 10),
+        station: station.name,
+        arrivedAtCustomer,
+      };
+
+      if (onPositionChange) onPositionChange(nextPosition);
+      setPosition(nextPosition);
+    };
+
+    const timer = setInterval(() => computePosition(Date.now()), TICK_MS);
+    computePosition(Date.now());
     return () => clearInterval(timer);
-  }, [position, onArrival, onPositionChange]);
+  }, [segment, durationMs, orderId, restaurant.lat, restaurant.lng, customer.lat, customer.lng, station.name, storageKey]);
 
   const pathPoints: [number, number][] = (() => {
     if (!position) return [];
-    if (position.status === "pickup" || position.status === "waiting_at_restaurant") {
+    if (segment === "pickup" || position.status === "pickup" || position.status === "waiting_at_restaurant") {
       return [
-        [SIM_STATION.lat, SIM_STATION.lng],
-        [SIM_RESTAURANT.lat, SIM_RESTAURANT.lng],
+        [station.lat, station.lng],
+        [restaurant.lat, restaurant.lng],
       ];
     }
-    if (position.status === "delivering" || position.status === "arrived") {
-      return [
-        [SIM_RESTAURANT.lat, SIM_RESTAURANT.lng],
-        [SIM_CUSTOMER.lat, SIM_CUSTOMER.lng],
-      ];
-    }
-    return [];
+    return [
+      [restaurant.lat, restaurant.lng],
+      [customer.lat, customer.lng],
+    ];
   })();
 
   return (
     <div className="space-y-3">
       <div className="w-full rounded-lg overflow-hidden border" style={{ height }}>
         {mapReady && (
-          <MapContainer center={DEFAULT_CENTER} zoom={13} style={{ height: "100%", width: "100%" }}>
+          <MapContainer
+            center={position ? [position.lat, position.lng] : DEFAULT_CENTER}
+            zoom={13}
+            style={{ height: "100%", width: "100%" }}
+          >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             {position && <AutoCenter lat={position.lat} lng={position.lng} status={position.status} />}
             {position && <Marker position={[position.lat, position.lng]} icon={redIcon} />}
-            <Marker position={[SIM_RESTAURANT.lat, SIM_RESTAURANT.lng]} icon={blueIcon} />
-            <Marker position={[SIM_CUSTOMER.lat, SIM_CUSTOMER.lng]} icon={greenIcon} />
+            <Marker position={[restaurant.lat, restaurant.lng]} icon={blueIcon} />
+            <Marker position={[customer.lat, customer.lng]} icon={greenIcon} />
             {pathPoints.length === 2 && (
               <Polyline
                 positions={pathPoints}

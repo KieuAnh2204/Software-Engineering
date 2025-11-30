@@ -14,9 +14,10 @@ const ARRIVAL_POLL_MS = 1000;
 type Props = {
   orderId: string;
   onSuccess?: () => void;
+  arrivedOverride?: boolean;
 };
 
-export default function DronePinVerification({ orderId, onSuccess }: Props) {
+export default function DronePinVerification({ orderId, onSuccess, arrivedOverride }: Props) {
   const [pin, setPin] = useState(["", "", "", ""]);
   const [droneArrived, setDroneArrived] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -54,7 +55,9 @@ export default function DronePinVerification({ orderId, onSuccess }: Props) {
         onSuccess();
       }
     } catch (error: any) {
-      if (error?.response?.status !== 404) {
+      if (error?.response?.status === 404) {
+        setDroneArrived(true);
+      } else if (error?.response?.status !== 404) {
         console.error("Arrival status error", error);
       }
     }
@@ -80,7 +83,8 @@ export default function DronePinVerification({ orderId, onSuccess }: Props) {
       return;
     }
 
-    if (!droneArrived) {
+    const arrived = droneArrived || arrivedOverride;
+    if (!arrived) {
       toast({
         title: "Drone chưa tới",
         description: "Vui lòng chờ drone hạ cánh rồi thử lại.",
@@ -125,12 +129,27 @@ export default function DronePinVerification({ orderId, onSuccess }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
+  useEffect(() => {
+    if (arrivedOverride) {
+      setDroneArrived(true);
+    }
+  }, [arrivedOverride]);
+
+  useEffect(() => {
+    const input = document.getElementById("pin-0") as HTMLInputElement | null;
+    if (input && (droneArrived || arrivedOverride)) {
+      input.focus();
+    }
+  }, [droneArrived, arrivedOverride]);
+
+  const arrived = droneArrived || arrivedOverride;
+
   return (
     <Card className="max-w-md w-full">
       <CardHeader className="text-center">
         <div className="flex justify-center mb-3">
           <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-            {droneArrived ? (
+            {arrived ? (
               <Unlock className="h-7 w-7 text-primary" />
             ) : (
               <Lock className="h-7 w-7 text-muted-foreground" />
@@ -142,8 +161,8 @@ export default function DronePinVerification({ orderId, onSuccess }: Props) {
           Drone chỉ mở khoang khi bạn nhập 4 số cuối của số điện thoại đã đặt hàng.
         </p>
         <div className="flex justify-center mt-2">
-          <Badge variant={droneArrived ? "default" : "secondary"} className="capitalize">
-            {droneArrived ? "Đã tới điểm giao" : "Đang bay tới..."}
+          <Badge variant={arrived ? "default" : "secondary"} className="capitalize">
+            {arrived ? "Đã tới điểm giao" : "Đang bay tới..."}
           </Badge>
         </div>
       </CardHeader>
@@ -157,7 +176,7 @@ export default function DronePinVerification({ orderId, onSuccess }: Props) {
               type="text"
               inputMode="numeric"
               maxLength={1}
-              disabled={!droneArrived || verifying}
+              disabled={!arrived || verifying}
               value={digit}
               onChange={(e) => handlePinChange(index, e.target.value)}
               onKeyDown={(e) => handleKeyDown(index, e)}
@@ -168,7 +187,7 @@ export default function DronePinVerification({ orderId, onSuccess }: Props) {
 
         <Button
           onClick={handleVerify}
-          disabled={!droneArrived || verifying || pin.some((p) => !p)}
+          disabled={!arrived || verifying || pin.some((p) => !p)}
           className="w-full"
           size="lg"
         >

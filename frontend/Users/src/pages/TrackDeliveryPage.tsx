@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Link } from "wouter";
 import axios from "axios";
 import { Header } from "@/components/Header";
@@ -9,6 +9,9 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import TrackDrone from "@/components/TrackDrone";
 import { formatVND } from "@/lib/currency";
+import { getFixedRestaurantLocation } from "@/lib/restaurantLocations";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import DronePinVerification from "@/components/DronePinVerification";
 
 const ORDER_API = import.meta.env?.VITE_ORDER_API ?? "http://localhost:3002/api/orders";
 const RESTAURANT_FALLBACK = { lng: 106.7009, lat: 10.7769 };
@@ -20,6 +23,10 @@ type Order = {
   total_amount?: number;
   long_address?: string;
   pin_code?: string;
+  assigned_drone_id?: string;
+  restaurant_id?: string;
+  restaurant_location?: { lat: number; lng: number };
+  customer_location?: { lat: number; lng: number };
 };
 
 export default function TrackDeliveryPage() {
@@ -29,38 +36,119 @@ export default function TrackDeliveryPage() {
   const [droneStatus, setDroneStatus] = useState<string>("assigning");
   const [droneId, setDroneId] = useState<string | undefined>();
   const [droneArrived, setDroneArrived] = useState(false);
+  const [showPinDialog, setShowPinDialog] = useState(false);
+  const arrivalShownRef = useRef(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    setDroneArrived(false);
+    setDroneStatus("assigning");
+    setDroneId(undefined);
+    setShowPinDialog(false);
+    arrivalShownRef.current = false;
+  }, [orderId]);
 
   const getAuthHeader = () => {
     const token = localStorage.getItem("token");
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
-  const fetchOrder = async () => {
-    if (!orderId) return;
-    try {
-      const res = await axios.get(`${ORDER_API}/${orderId}`, {
-        headers: getAuthHeader(),
-      });
-      const ord = res.data?.order || res.data;
-      setOrder(ord);
-    } catch (error: any) {
-      console.error("Failed to load order", error);
-      toast({
-        title: "Cannot load order",
-        description: error?.response?.data?.message || "Please try again",
-        variant: "destructive",
-      });
-    }
-  };
+  const fetchOrder = useCallback(
+    async (silent?: boolean) => {
+      if (!orderId) return;
+      try {
+        const res = await axios.get(`${ORDER_API}/${orderId}`, {
+          headers: getAuthHeader(),
+        });
+        const ord = res.data?.order || res.data;
+        setOrder(ord);
+        if (ord?.customer_location) {
+          try {
+            localStorage.setItem(`order-customer-location-${orderId}`, JSON.stringify(ord.customer_location));
+          } catch {
+            // ignore storage errors
+          }
+        }
+        if (ord?.assigned_drone_id) {
+          setDroneId(ord.assigned_drone_id);
+        }
+        if (ord?.status === "completed" || ord?.status === "arrived") {
+          setDroneArrived(true);
+        }
+        if (ord?.status === "delivering") {
+          try {
+            const key = `drone-sim-${orderId}-v1`;
+            const raw = localStorage.getItem(key);
+            const parsed = raw ? JSON.parse(raw) : {};
+            if (!parsed.deliveryStart) {
+              parsed.pickupDone = true;
+              parsed.deliveryStart = Date.now();
+              localStorage.setItem(key, JSON.stringify(parsed));
+            }
+          } catch {
+            // ignore storage issues
+          }
+        }
+      } catch (error: any) {
+        console.error("Failed to load order", error);
+        if (!silent) {
+          toast({
+            title: "Cannot load order",
+            description: error?.response?.data?.message || "Please try again",
+            variant: "destructive",
+          });
+        }
+      }
+    },
+    [orderId, toast]
+  );
 
   useEffect(() => {
     fetchOrder();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderId]);
+    const id = setInterval(() => fetchOrder(true), 5000);
+    return () => clearInterval(id);
+  }, [fetchOrder]);
 
-  const arrived = droneArrived || order?.status === "completed";
-  const statusBadge = droneArrived ? "arrived" : droneStatus || order?.status || "loading";
+  useEffect(() => {
+    if (!arrivalShownRef.current && droneArrived && order?.status !== "completed") {
+      arrivalShownRef.current = true;
+      setShowPinDialog(true);
+    }
+  }, [droneArrived, order?.status]);
+
+  const isDelivering = order?.status === "delivering";
+  const arrived = droneArrived || order?.status === "completed" || order?.status === "arrived";
+  const statusBadge = arrived
+    ? "arrived"
+    : isDelivering
+      ? droneStatus || order?.status || "loading"
+      : order?.status || "loading";
+  const canOpenPin = arrived && order?.status !== "completed";
+  const restaurantLocation =
+    order?.restaurant_location ||
+    (order?.restaurant_id ? getFixedRestaurantLocation(order.restaurant_id) : RESTAURANT_FALLBACK);
+  const storedCustomer = (() => {
+    try {
+      const raw = localStorage.getItem(`order-customer-location-${orderId}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  })();
+  const customerLocation = order?.customer_location || storedCustomer || CUSTOMER_FALLBACK;
+
+  const handlePinSuccess = async () => {
+    setShowPinDialog(false);
+    setDroneArrived(true);
+    setOrder((prev) => (prev ? { ...prev, status: "completed" } : prev));
+    setDroneStatus("completed");
+    try {
+      localStorage.setItem(`order-completed-${orderId}`, Date.now().toString());
+    } catch {
+      // ignore storage errors
+    }
+    await fetchOrder(true);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -75,29 +163,43 @@ export default function TrackDeliveryPage() {
             <Badge variant="outline" className="text-sm capitalize">
               {statusBadge}
             </Badge>
-            {arrived && (
-              <Button asChild className="bg-green-600 hover:bg-green-700">
-                <Link href={`/drone/verify/${orderId}`}>Open PIN screen</Link>
-              </Button>
-            )}
+            <Button
+              className="bg-green-600 hover:bg-green-700 disabled:opacity-60"
+              onClick={() => setShowPinDialog(true)}
+              disabled={!canOpenPin}
+            >
+              Open PIN
+            </Button>
           </div>
         </div>
 
         <div className="grid lg:grid-cols-5 gap-4">
           <Card className="lg:col-span-3 overflow-hidden">
             <CardContent className="p-0">
-              <TrackDrone
-                orderId={orderId}
-                restaurantLocation={RESTAURANT_FALLBACK}
-                customerLocation={CUSTOMER_FALLBACK}
-                height={580}
-                onArrival={() => setDroneArrived(true)}
-                onPositionChange={(pos) => {
-                  setDroneStatus(pos.status);
-                  setDroneId(pos.droneId);
-                  if (pos.arrivedAtCustomer) setDroneArrived(true);
-                }}
-              />
+              {isDelivering ? (
+                <TrackDrone
+                  orderId={orderId}
+                  restaurantLocation={restaurantLocation}
+                  customerLocation={customerLocation}
+                  segment="delivery"
+                  durationMs={10000}
+                  persistKey={orderId}
+                  height={580}
+                  onArrival={() => setDroneArrived(true)}
+                  onPositionChange={(pos) => {
+                    setDroneStatus(pos.status);
+                    setDroneId(pos.droneId);
+                    if (pos.arrivedAtCustomer) setDroneArrived(true);
+                  }}
+                />
+              ) : (
+                <div className="flex h-[580px] flex-col items-center justify-center px-6 text-center text-sm text-muted-foreground">
+                  <p>Tracking starts once the order is marked as delivering.</p>
+                  <p className="mt-2 text-xs">
+                    Current status: {order?.status || "Updating..."}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -118,7 +220,9 @@ export default function TrackDeliveryPage() {
 
                 <div className="flex justify-between items-start">
                   <span className="text-sm text-muted-foreground">Drone ID</span>
-                  <span className="text-sm font-medium">{droneId || "Assigning..."}</span>
+                  <span className="text-sm font-medium">
+                    {droneId || order?.assigned_drone_id || "Assigning..."}
+                  </span>
                 </div>
 
                 <Separator />
@@ -151,17 +255,27 @@ export default function TrackDeliveryPage() {
                   <Link href={`/order-status/${orderId}`}>Order details</Link>
                 </Button>
                 <Button
-                  asChild
                   className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60"
-                  disabled={!arrived}
+                  disabled={!canOpenPin}
+                  onClick={() => setShowPinDialog(true)}
                 >
-                  <Link href={`/drone/verify/${orderId}`}>Open PIN</Link>
+                  Open PIN
                 </Button>
               </div>
             </CardContent>
           </Card>
         </div>
       </main>
+      <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
+        <DialogContent className="sm:max-w-lg overflow-visible">
+          <DialogHeader>
+            <DialogTitle>Enter delivery PIN</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center">
+            <DronePinVerification orderId={orderId} onSuccess={handlePinSuccess} arrivedOverride={arrived} />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

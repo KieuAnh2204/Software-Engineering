@@ -568,38 +568,46 @@ exports.verifyPin = async (req, res, next) => {
       });
     }
 
-    // Ensure drone actually reached the customer
-    if (!DRONES_DISABLED) {
-      try {
-        const arrival = await fetchDroneArrival(orderId);
-        if (!arrival.data?.droneArrived) {
-          return res.status(400).json({
-            success: false,
-            message: 'Drone has not arrived yet. Please wait a moment.',
-          });
+      // Ensure drone actually reached the customer
+      if (!DRONES_DISABLED) {
+        try {
+          const arrival = await fetchDroneArrival(orderId);
+          if (!arrival.data?.droneArrived) {
+            return res.status(400).json({
+              success: false,
+              message: 'Drone has not arrived yet. Please wait a moment.',
+            });
+          }
+        } catch (droneError) {
+          if (droneError?.response?.status === 404) {
+            console.warn('Drone arrival check 404, treating as arrived for order', orderId);
+          } else {
+            console.error('Arrival check failed:', droneError.message);
+            return res.status(400).json({
+              success: false,
+              message: 'Unable to verify drone arrival. Try again shortly.',
+            });
+          }
         }
-      } catch (droneError) {
-        console.error('Arrival check failed:', droneError.message);
-        return res.status(400).json({
-          success: false,
-          message: 'Unable to verify drone arrival. Try again shortly.',
-        });
       }
-    }
 
-    if (!DRONES_DISABLED) {
-      try {
-        await verifyWithDroneService(orderId, pin);
-      } catch (droneError) {
-        console.error('Drone PIN verification failed:', droneError.message);
-        return res.status(400).json({
-          success: false,
-          message:
-            droneError?.response?.data?.message ||
-            'Drone did not accept the PIN yet. Please retry.',
-        });
+      if (!DRONES_DISABLED) {
+        try {
+          await verifyWithDroneService(orderId, pin);
+        } catch (droneError) {
+          if (droneError?.response?.status === 404) {
+            console.warn('Drone verify 404, allowing completion for order', orderId);
+          } else {
+            console.error('Drone PIN verification failed:', droneError.message);
+            return res.status(400).json({
+              success: false,
+              message:
+                droneError?.response?.data?.message ||
+                'Drone did not accept the PIN yet. Please retry.',
+            });
+          }
+        }
       }
-    }
 
     // PIN accepted - complete the order
     order.status = 'completed';

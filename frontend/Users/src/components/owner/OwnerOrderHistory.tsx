@@ -32,6 +32,7 @@ export default function OwnerOrderHistory() {
   const { owner, restaurantId: ctxRestaurantId } = useRestaurantOwnerAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const token = localStorage.getItem("token") || "";
   const orderBaseUrl =
@@ -45,10 +46,10 @@ export default function OwnerOrderHistory() {
     "";
 
   useEffect(() => {
-    const fetchOrders = async () => {
+    const fetchOrders = async (silent = false) => {
       if (!orderBaseUrl || !restaurantId) return;
       try {
-        setLoading(true);
+        silent ? setRefreshing(true) : setLoading(true);
         const res = await axios.get(
           `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=completed`,
           {
@@ -60,11 +61,19 @@ export default function OwnerOrderHistory() {
       } catch (err) {
         console.error("Error loading orders:", err);
       } finally {
-        setLoading(false);
+        silent ? setRefreshing(false) : setLoading(false);
       }
     };
 
     fetchOrders();
+    const handler = (e: StorageEvent) => {
+      if (!e.key) return;
+      if (e.key.startsWith("order-completed-")) {
+        fetchOrders(true);
+      }
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
   }, [orderBaseUrl, restaurantId, token]);
 
   const completedOrders = useMemo(
