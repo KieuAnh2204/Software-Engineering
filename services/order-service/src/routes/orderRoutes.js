@@ -10,12 +10,17 @@ router.post('/payment/callback', order.paymentCallback);
 
 router.use(authenticate);
 
+<<<<<<< HEAD
 // Admin analytics
 router.get(
   '/admin/analytics/revenue',
   authorize('admin'),
   order.getAdminRevenueSummary
 );
+=======
+// direct order creation (without cart)
+router.post('/', order.createOrder);
+>>>>>>> origin/beta30-11
 
 // cart
 router.get('/cart', cart.getCart);
@@ -41,6 +46,9 @@ router.patch(
 // customer history
 router.get('/', order.listOrders);
 router.get('/:orderId', order.getOrder);
+
+// PIN verification for delivery
+router.post('/:orderId/verify-pin', order.verifyPin);
 
 // payment simulation (customer/admin)
 router.post('/:orderId/mock-pay', order.mockMarkPaid);

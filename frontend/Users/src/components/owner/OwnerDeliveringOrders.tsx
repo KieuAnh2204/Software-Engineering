@@ -3,7 +3,7 @@ import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Truck, RefreshCcw, MapPin } from "lucide-react";
+import { Clock, RefreshCcw, MapPin } from "lucide-react";
 import TrackDrone from "@/components/TrackDrone";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -42,7 +42,7 @@ type Order = {
   customer_location?: { lat: number; lng: number };
 };
 
-export default function OwnerReadyOrders() {
+export default function OwnerDeliveringOrders() {
   const { toast } = useToast();
   const { owner, restaurantId: ctxRestaurantId } = useRestaurantOwnerAuth();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -76,15 +76,16 @@ export default function OwnerReadyOrders() {
     try {
       silent ? setRefreshing(true) : setLoading(true);
       const res = await axios.get(
-        `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=ready_for_delivery`,
+        `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=delivering`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
       const items: Order[] = res.data?.data || res.data?.items || [];
-      setOrders(items);
-      // Kick off pickup leg timers so tracking doesn't restart when reopening the dialog
+      const deliveringOnly = items.filter((o) => (o.status || "").toLowerCase() === "delivering");
+      setOrders(deliveringOnly);
+      // Keep delivery leg progress in sync across dialog opens
       try {
         items.forEach((o) => {
           const id = o._id || o.id;
@@ -92,10 +93,12 @@ export default function OwnerReadyOrders() {
           const key = `drone-sim-${id}-v1`;
           const raw = localStorage.getItem(key);
           const parsed = raw ? JSON.parse(raw) : {};
-          if (!parsed.pickupStart) {
-            parsed.pickupStart = Date.now();
-            localStorage.setItem(key, JSON.stringify(parsed));
-          }
+          const next = {
+            ...parsed,
+            pickupDone: true,
+            deliveryStart: parsed?.deliveryStart || Date.now(),
+          };
+          localStorage.setItem(key, JSON.stringify(next));
           if (o.customer_location) {
             localStorage.setItem(
               `order-customer-location-${id}`,
@@ -123,60 +126,18 @@ export default function OwnerReadyOrders() {
     return () => clearInterval(interval);
   }, [fetchOrders, restaurantId]);
 
-  const handleStartDelivering = async (orderId: string) => {
-    if (!orderBaseUrl || !restaurantId) return;
-    const restaurantLoc = getFixedRestaurantLocation(restaurantId);
-    const order = orders.find((o) => (o._id || o.id) === orderId);
-    const customerLoc = order?.customer_location || CUSTOMER_FALLBACK;
-    try {
-      await axios.patch(
-        `${orderBaseUrl}/${orderId}/status`,
-        { 
-          status: "delivering", 
-          restaurant_id: restaurantId,
-          restaurant_location: { lat: restaurantLoc.lat, lng: restaurantLoc.lng },
-          customer_location: customerLoc
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      // Persist delivery start to keep the drone path in sync across views
-      try {
-        const key = `drone-sim-${orderId}-v1`;
-        const raw = localStorage.getItem(key);
-        const parsed = raw ? JSON.parse(raw) : {};
-        const next = {
-          ...parsed,
-          pickupDone: true,
-          deliveryStart: parsed?.deliveryStart || Date.now(),
-        };
-        localStorage.setItem(key, JSON.stringify(next));
-      } catch {
-        // ignore storage issues
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (!e.key) return;
+      if (e.key.startsWith("order-completed-")) {
+        fetchOrders(true);
       }
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, [fetchOrders]);
 
-      await fetchOrders();
-      toast({ title: "Order marked as delivering" });
-    } catch (err) {
-      console.error("Error updating order:", err);
-      toast({
-        title: "Failed to update order status",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const readyOrders =
-    orders.filter(
-      (order) =>
-        order.status === "ready_for_delivery" &&
-        ["paid", "pending"].includes(order.payment_status || "")
-    ) || [];
-  const ordersToRender = readyOrders;
-
-  if (loading && ordersToRender.length === 0) {
+  if (loading && orders.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">Loading orders...</p>
@@ -184,14 +145,14 @@ export default function OwnerReadyOrders() {
     );
   }
 
-  if (ordersToRender.length === 0) {
+  if ((orders || []).length === 0) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16">
-          <Truck className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">No Orders Ready</h3>
+          <Clock className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium mb-2">No Delivering Orders</h3>
           <p className="text-sm text-muted-foreground">
-            Orders marked as ready will appear here
+            Orders in flight will appear here.
           </p>
           <Button
             variant="outline"
@@ -199,7 +160,7 @@ export default function OwnerReadyOrders() {
             className="mt-4"
             onClick={() => fetchOrders(false)}
             disabled={loading || refreshing}
-            data-testid="button-refresh-ready"
+            data-testid="button-refresh-delivering"
           >
             <RefreshCcw className="h-4 w-4 mr-2" />
             Refresh
@@ -212,20 +173,21 @@ export default function OwnerReadyOrders() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Ready Orders</h2>
+        <h2 className="text-xl font-semibold">Delivering Orders</h2>
         <Button
           variant="outline"
           size="sm"
           onClick={() => fetchOrders(true)}
           disabled={loading || refreshing}
-          data-testid="button-refresh-ready"
+          data-testid="button-refresh-delivering"
           className="flex items-center gap-2"
         >
           <RefreshCcw className="h-4 w-4" />
           Refresh
         </Button>
       </div>
-      {ordersToRender.map((order) => {
+
+      {orders.map((order) => {
         const orderId = order._id || order.id || "";
         const totalAmount = order.total_amount || order.totalAmount || 0;
         const customerName = order.customer_name || order.customerName || "N/A";
@@ -250,11 +212,8 @@ export default function OwnerReadyOrders() {
                 <div className="space-y-1">
                   <CardTitle className="text-lg">{dishName}</CardTitle>
                   <div className="flex items-center gap-2">
-                    <Badge
-                      variant="default"
-                      data-testid={`badge-status-${orderId}`}
-                    >
-                      Ready for Delivery / Paid
+                    <Badge variant="default" data-testid={`badge-status-${orderId}`}>
+                      Delivering / Paid
                     </Badge>
                     <span className="text-sm text-muted-foreground">
                       {orderedTime
@@ -276,12 +235,8 @@ export default function OwnerReadyOrders() {
                   >
                     <MapPin className="h-4 w-4 mr-1" /> Track Drone
                   </Button>
-                  <Button
-                    onClick={() => handleStartDelivering(orderId)}
-                    disabled={loading || refreshing}
-                    data-testid={`button-delivering-${orderId}`}
-                  >
-                    Start Delivering
+                  <Button variant="secondary" disabled data-testid={`button-waiting-${orderId}`}>
+                    Waiting for customer PIN
                   </Button>
                 </div>
               </div>
@@ -322,7 +277,7 @@ export default function OwnerReadyOrders() {
             <TrackDrone
               orderId={trackingOrderId}
               height={420}
-              segment="pickup"
+              segment="delivery"
               durationMs={10000}
               persistKey={trackingOrderId}
               restaurantLocation={getFixedRestaurantLocation(restaurantId)}

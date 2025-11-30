@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { isSameDay } from "date-fns";
+import { useRestaurantOwnerAuth } from "@/contexts/RestaurantOwnerAuthContext";
+import { formatVND } from "@/lib/currency";
 
 const TOTAL_ORDER_STATUSES = ["confirmed", "preparing", "ready_for_pickup", "completed"] as const;
 const PENDING_STATUSES = ["pending", "payment_pending", "submitted"] as const;
@@ -71,17 +73,12 @@ const parseOrderDate = (order: Order) => {
   return isNaN(parsed.getTime()) ? null : parsed;
 };
 
-const formatVND = (amount: number) =>
-  `VND ${new Intl.NumberFormat("vi-VN", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount)}`;
-
 export default function OwnerDashboardOverview({
   onNavigate,
 }: {
   onNavigate?: (view: string) => void;
 }) {
+  const { restaurantId: ctxRestaurantId } = useRestaurantOwnerAuth();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(true);
   const [stats, setStats] = useState<Stats>({
@@ -101,6 +98,7 @@ export default function OwnerDashboardOverview({
     import.meta.env.VITE_ORDER_API ||
     "http://localhost:3002/api/orders";
   const restaurantId =
+    ctxRestaurantId ||
     localStorage.getItem("restaurant_id") ||
     localStorage.getItem("owner_restaurant_id") ||
     localStorage.getItem("restaurantId") ||
@@ -115,11 +113,11 @@ export default function OwnerDashboardOverview({
       }));
 
       const pending = normalized
-        .filter(({ normalizedStatus }) => PENDING_STATUSES.includes(normalizedStatus))
+        .filter(({ normalizedStatus }) => PENDING_STATUSES.includes(normalizedStatus as any))
         .map(({ order }) => order);
 
       const totalOrders = normalized.filter(({ normalizedStatus }) =>
-        TOTAL_ORDER_STATUSES.includes(normalizedStatus)
+        TOTAL_ORDER_STATUSES.includes(normalizedStatus as any)
       ).length;
 
       const todaysOrders = normalized.filter(

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { formatVND } from "@/lib/currency";
 
 export default function CartTestPage() {
   const { cart, itemCount, addToCart, isLoading } = useCart();
@@ -92,7 +93,7 @@ export default function CartTestPage() {
               <div className="flex justify-between">
                 <span>Total Amount:</span>
                 <span className="font-bold">
-                  {cart?.total_amount ? `${cart.total_amount.toLocaleString()} VND` : "0 VND"}
+                  {cart?.total_amount ? formatVND(cart.total_amount) : formatVND(0)}
                 </span>
               </div>
             </CardContent>
@@ -111,11 +112,11 @@ export default function CartTestPage() {
                       <div>
                         <p className="font-semibold">{item.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          Quantity: {item.quantity} × {item.price.toLocaleString()} VND
+                          Quantity: {item.quantity} × {formatVND(item.price)}
                         </p>
                       </div>
                       <p className="font-bold">
-                        {(item.quantity * item.price).toLocaleString()} VND
+                        {formatVND(item.quantity * item.price)}
                       </p>
                     </div>
                   ))}

@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Clock, RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { useRestaurantOwnerAuth } from "@/contexts/RestaurantOwnerAuthContext";
+import { formatVND } from "@/lib/currency";
 
 type OrderItem = {
   name?: string;
@@ -33,6 +35,7 @@ type Order = {
 
 export default function OwnerPendingOrders() {
   const { toast } = useToast();
+  const { owner, restaurantId: ctxRestaurantId } = useRestaurantOwnerAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -40,13 +43,12 @@ export default function OwnerPendingOrders() {
   const orderBaseUrl =
     import.meta.env.VITE_ORDER_BASE_URL || import.meta.env.VITE_ORDER_API || "http://localhost:3002/api/orders";
   const restaurantId =
+    ctxRestaurantId ||
     localStorage.getItem("restaurant_id") ||
     localStorage.getItem("owner_restaurant_id") ||
     localStorage.getItem("restaurantId") ||
+    owner?.id ||
     "";
-
-  const formatVND = (value?: number) =>
-    `${(value || 0).toLocaleString("vi-VN")} ₫`;
 
   const fetchOrders = useCallback(async () => {
     if (!orderBaseUrl) return;
@@ -61,7 +63,7 @@ export default function OwnerPendingOrders() {
     try {
       setLoading(true);
       const res = await axios.get(
-        `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=confirmed`,
+        `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=confirmed,payment_pending,submitted,preparing`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -77,10 +79,12 @@ export default function OwnerPendingOrders() {
     } finally {
       setLoading(false);
     }
-  }, [orderBaseUrl, token, toast]);
+  }, [orderBaseUrl, restaurantId, token, toast]);
 
   useEffect(() => {
     fetchOrders();
+    const interval = setInterval(fetchOrders, 5000);
+    return () => clearInterval(interval);
   }, [fetchOrders, restaurantId]);
 
   const handleMarkReady = async (orderId: string) => {
@@ -88,14 +92,15 @@ export default function OwnerPendingOrders() {
     try {
       await axios.patch(
         `${orderBaseUrl}/${orderId}/status`,
-        { status: "preparing", restaurant_id: restaurantId },
+        { status: "ready_for_delivery", restaurant_id: restaurantId },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
-      await fetchOrders();
-      toast({ title: "Order moved to preparing" });
+      // Remove from pending list so it moves to Ready tab
+      setOrders((prev) => prev.filter((o) => (o._id || o.id) !== orderId));
+      toast({ title: "Order marked ready for delivery" });
     } catch (err) {
       console.error("Error updating order:", err);
       toast({
@@ -105,12 +110,10 @@ export default function OwnerPendingOrders() {
     }
   };
 
-  const pendingOrders =
-    orders.filter(
-      (order) =>
-        order.status === "confirmed" && order.payment_status === "paid"
+  const ordersToRender =
+    orders.filter((order) =>
+      ["submitted", "confirmed", "payment_pending", "preparing"].includes(order.status || "")
     ) || [];
-  const ordersToRender = pendingOrders;
 
   if (loading) {
     return (
@@ -180,7 +183,7 @@ export default function OwnerPendingOrders() {
                       variant="default"
                       data-testid={`badge-status-${orderId}`}
                     >
-                      Confirmed / Paid
+                      Pending / {order.payment_status}
                     </Badge>
                     <span className="text-sm text-muted-foreground">
                       {orderedTime
@@ -195,7 +198,7 @@ export default function OwnerPendingOrders() {
                   data-testid={`button-ready-${orderId}`}
                 >
                   <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Start Preparing
+                  Ready
                 </Button>
               </div>
           </CardHeader>

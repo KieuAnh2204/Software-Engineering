@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Clock, RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { formatVND } from "@/lib/currency";
 
 type OrderItem = {
   name?: string;
@@ -47,9 +48,6 @@ export default function OwnerPreparingOrders() {
     localStorage.getItem("restaurantId") ||
     "";
 
-  const formatVND = (value?: number) =>
-    `${(value || 0).toLocaleString("vi-VN")} ₫`;
-
   const fetchOrders = useCallback(async () => {
     if (!orderBaseUrl) return;
     if (!restaurantId) {
@@ -90,14 +88,14 @@ export default function OwnerPreparingOrders() {
     try {
       await axios.patch(
         `${orderBaseUrl}/${orderId}/status`,
-        { status: "ready_for_pickup", restaurant_id: restaurantId },
+        { status: "ready_for_delivery", restaurant_id: restaurantId },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
       await fetchOrders();
-      toast({ title: "Order marked ready for pickup" });
+      toast({ title: "Order marked ready for delivery" });
     } catch (err) {
       console.error("Error updating order:", err);
       toast({
@@ -110,7 +108,7 @@ export default function OwnerPreparingOrders() {
   const ordersToRender =
     orders.filter(
       (order) =>
-        order.status === "preparing" && order.payment_status === "paid"
+        order.status === "preparing" && ["paid", "pending"].includes(order.payment_status || "")
     ) || [];
 
   if (loading) {

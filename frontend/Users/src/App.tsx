@@ -31,6 +31,8 @@ import RestaurantRegister from "@/pages/RestaurantRegister";
 import OwnerDashboard from "@/pages/OwnerDashboard";
 import ApiTestPage from "@/pages/ApiTestPage";
 import OrderStatus from "@/pages/OrderStatus";
+import TrackDeliveryPage from "@/pages/TrackDeliveryPage";
+import OrderPinPage from "@/pages/OrderPinPage";
 
 function Router() {
   return (
@@ -54,6 +56,9 @@ function Router() {
       <Route path="/owner/dashboard" component={OwnerDashboard} />
       <Route path="/test-api" component={ApiTestPage} />
       <Route path="/order-status/:id" component={OrderStatus} />
+      <Route path="/track/:orderId" component={TrackDeliveryPage} />
+      <Route path="/order-pin/:orderId" component={OrderPinPage} />
+      <Route path="/drone/verify/:orderId" component={OrderPinPage} />
       <Route component={NotFound} />
     </Switch>
   );

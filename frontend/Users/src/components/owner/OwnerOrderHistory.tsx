@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, History } from "lucide-react";
 import { format } from "date-fns";
+import { useRestaurantOwnerAuth } from "@/contexts/RestaurantOwnerAuthContext";
+import { formatVND } from "@/lib/currency";
 
 type OrderItem = {
   name?: string;
@@ -27,20 +29,29 @@ type Order = {
 };
 
 export default function OwnerOrderHistory() {
+  const { owner, restaurantId: ctxRestaurantId } = useRestaurantOwnerAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const token = localStorage.getItem("token") || "";
   const orderBaseUrl =
-    import.meta.env.VITE_ORDER_BASE_URL || import.meta.env.VITE_ORDER_API;
+    import.meta.env.VITE_ORDER_BASE_URL || import.meta.env.VITE_ORDER_API || "http://localhost:3002/api/orders";
+  const restaurantId =
+    ctxRestaurantId ||
+    localStorage.getItem("restaurant_id") ||
+    localStorage.getItem("owner_restaurant_id") ||
+    localStorage.getItem("restaurantId") ||
+    owner?.id ||
+    "";
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      if (!orderBaseUrl) return;
+    const fetchOrders = async (silent = false) => {
+      if (!orderBaseUrl || !restaurantId) return;
       try {
-        setLoading(true);
+        silent ? setRefreshing(true) : setLoading(true);
         const res = await axios.get(
-          `${orderBaseUrl}/orders?status=completed`,
+          `${orderBaseUrl}/restaurant?restaurant_id=${restaurantId}&status=completed`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -50,12 +61,20 @@ export default function OwnerOrderHistory() {
       } catch (err) {
         console.error("Error loading orders:", err);
       } finally {
-        setLoading(false);
+        silent ? setRefreshing(false) : setLoading(false);
       }
     };
 
     fetchOrders();
-  }, [orderBaseUrl, token]);
+    const handler = (e: StorageEvent) => {
+      if (!e.key) return;
+      if (e.key.startsWith("order-completed-")) {
+        fetchOrders(true);
+      }
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, [orderBaseUrl, restaurantId, token]);
 
   const completedOrders = useMemo(
     () =>
@@ -131,7 +150,7 @@ export default function OwnerOrderHistory() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold">${totalAmount}</p>
+                  <p className="text-lg font-bold">{formatVND(totalAmount)}</p>
                 </div>
               </div>
             </CardHeader>

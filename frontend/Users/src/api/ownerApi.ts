@@ -74,6 +74,16 @@ export const getOwnerRestaurants = (ownerId: string) =>
 
 export const getOwnerProfile = () => userClient.get("/owners/me");
 
+export const getRestaurantById = (id: string) => productClient.get(`/restaurants/${id}`);
+
+export const updateRestaurant = (id: string, data: Record<string, unknown>) =>
+  productClient.put(`/restaurants/${id}`, data);
+
+export const uploadDishImage = (form: FormData) =>
+  productClient.post("/dishes/upload-image", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+
 // =============================================
 // DISH MANAGEMENT APIs
 // =============================================

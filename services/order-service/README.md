@@ -15,6 +15,7 @@ Environment
 Run
 - Dev: `npm run dev`
 - Test: `npm test`
+- Local: `locallhost 5000`
 
 API
 - POST `/api/orders` Create order (auth)

@@ -33,13 +33,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useRestaurantOwnerAuth } from "@/contexts/RestaurantOwnerAuthContext";
 import { useLocation } from "wouter";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { RestaurantProfileDialog } from "@/components/owner/RestaurantProfileDialog";
 
 import OwnerDashboardOverview from "@/components/owner/OwnerDashboardOverview";
 import OwnerMenuManagement from "@/components/owner/OwnerMenuManagement";
 import OwnerPendingOrders from "@/components/owner/OwnerPendingOrders";
 import OwnerReadyOrders from "@/components/owner/OwnerReadyOrders";
 import OwnerOrderHistory from "@/components/owner/OwnerOrderHistory";
-import OwnerPreparingOrders from "@/components/owner/OwnerPreparingOrders";
+import OwnerDeliveringOrders from "@/components/owner/OwnerDeliveringOrders";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", value: "dashboard" },
@@ -48,16 +49,17 @@ const menuItems = [
 
 const orderMenuItems = [
   { icon: Clock, label: "Pending Orders", value: "pending-orders" },
-  { icon: Truck, label: "Preparing Orders", value: "preparing-orders" },
   { icon: Truck, label: "Ready Orders", value: "ready-orders" },
+  { icon: Truck, label: "Delivering Orders", value: "delivering-orders" },
   { icon: History, label: "Order History", value: "order-history" },
 ];
 
 export default function RestaurantOwnerDashboard() {
-  const { owner, isOwnerAuthenticated, ownerLogout } = useRestaurantOwnerAuth();
+  const { owner, isOwnerAuthenticated, ownerLogout, restaurantId } = useRestaurantOwnerAuth();
   const [, setLocation] = useLocation();
   const [activeView, setActiveView] = useState("dashboard");
   const [ordersOpen, setOrdersOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     if (!isOwnerAuthenticated) {
@@ -91,15 +93,18 @@ export default function RestaurantOwnerDashboard() {
         <div className="flex h-screen w-full overflow-hidden">
           <Sidebar className="border-r">
             <SidebarHeader className="p-4">
-              <div className="flex items-center gap-3">
+              <button
+                className="flex items-center gap-3 w-full text-left"
+                onClick={() => setProfileOpen(true)}
+              >
                 <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
                   <Store className="h-5 w-5 text-primary-foreground" />
                 </div>
-                <div>
-                  <h2 className="font-bold text-lg">{owner?.restaurantName}</h2>
-                  <p className="text-xs text-muted-foreground">Owner Portal</p>
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-bold text-lg truncate">{owner?.restaurantName || "My Restaurant"}</h2>
+                  <p className="text-xs text-muted-foreground truncate">Owner Portal</p>
                 </div>
-              </div>
+              </button>
             </SidebarHeader>
 
             <SidebarContent>
@@ -203,12 +208,17 @@ export default function RestaurantOwnerDashboard() {
               )}
               {activeView === "menu" && <OwnerMenuManagement />}
               {activeView === "pending-orders" && <OwnerPendingOrders />}
-              {activeView === "preparing-orders" && <OwnerPreparingOrders />}
               {activeView === "ready-orders" && <OwnerReadyOrders />}
+              {activeView === "delivering-orders" && <OwnerDeliveringOrders />}
               {activeView === "order-history" && <OwnerOrderHistory />}
             </main>
           </div>
         </div>
+        <RestaurantProfileDialog
+          open={profileOpen}
+          onOpenChange={setProfileOpen}
+          restaurantId={restaurantId}
+        />
       </SidebarProvider>
     </div>
   );
