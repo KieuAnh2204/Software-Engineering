@@ -128,8 +128,9 @@ export default function UserManagement() {
                 const displayName = customer.full_name || customer.user?.username || "N/A";
                 const email = customer.user?.email || "N/A";
                 const isActive = customer.user?.isActive !== false;
+                const userId = customer.user?._id || customer._id;
                 return (
-                  <TableRow key={customer._id}>
+                  <TableRow key={userId}>
                     <TableCell className="font-medium">{displayName}</TableCell>
                     <TableCell>{email}</TableCell>
                     <TableCell>{customer.phone || "N/A"}</TableCell>
@@ -157,7 +158,7 @@ export default function UserManagement() {
                           <DropdownMenuItem
                             onClick={() =>
                               updateStatusMutation.mutate({
-                                id: customer._id,
+                                id: userId,
                                 isActive: !isActive,
                               })
                             }

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Search, Plus, MoreVertical, Eye, Ban } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Search, MoreVertical, Eye, Ban } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -27,16 +27,29 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useQuery } from "@tanstack/react-query";
-import type { Dish } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function RestaurantManagement() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRestaurant, setSelectedRestaurant] = useState<any>(null);
 
-  const { data: dishes = [], isLoading: isDishesLoading } = useQuery<Dish[]>({
-    queryKey: ["/api/admin/dishes"],
+  const { data: restaurantResponse, isLoading } = useQuery<any>({
+    queryKey: ["/api/admin/restaurants"],
   });
+
+  const restaurants = useMemo(() => restaurantResponse?.data || [], [restaurantResponse]);
+
+  const { data: dishesResponse, isLoading: isDishesLoading, refetch: refetchDishes } = useQuery<any>({
+    queryKey: ["/api/admin/restaurants", selectedRestaurant?._id, "dishes"],
+    enabled: !!selectedRestaurant?._id,
+    queryFn: async () => {
+      if (!selectedRestaurant?._id) return { data: [] };
+      const res = await apiRequest("GET", `/api/admin/restaurants/${selectedRestaurant._id}/dishes`);
+      return res.json();
+    },
+  });
+  const dishes = dishesResponse?.data || [];
 
   const handleDeactivate = (restaurantId: string, restaurantName: string) => {
     toast({
@@ -45,12 +58,14 @@ export default function RestaurantManagement() {
     });
   };
 
-  const restaurants = [
-    { id: "1", name: "Bella Italia", cuisine: "Italian", rating: 4.8, orders: 156, revenue: 6234.89, status: "active", menuItems: 24 },
-    { id: "2", name: "Tokyo Fusion", cuisine: "Japanese", rating: 4.6, orders: 142, revenue: 5876.23, status: "active", menuItems: 31 },
-    { id: "3", name: "Burger House", cuisine: "American", rating: 4.5, orders: 138, revenue: 4521.45, status: "active", menuItems: 18 },
-    { id: "4", name: "Spice Garden", cuisine: "Indian", rating: 4.7, orders: 98, revenue: 3456.78, status: "inactive", menuItems: 27 },
-  ];
+  const filtered = restaurants.filter((r: any) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      r.name?.toLowerCase().includes(q) ||
+      r.address?.toLowerCase().includes(q) ||
+      r.phone?.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-4">
@@ -65,10 +80,6 @@ export default function RestaurantManagement() {
             data-testid="input-search-restaurants"
           />
         </div>
-        <Button data-testid="button-add-restaurant">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Restaurant
-        </Button>
       </div>
 
       <Card>
@@ -76,50 +87,73 @@ export default function RestaurantManagement() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Cuisine</TableHead>
-              <TableHead>Rating</TableHead>
-              <TableHead>Menu Items</TableHead>
-              <TableHead>Orders</TableHead>
-              <TableHead>Revenue</TableHead>
+              <TableHead>Phone</TableHead>
+              <TableHead>Address</TableHead>
+              <TableHead>Open/Close</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Created</TableHead>
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {restaurants.map((restaurant) => (
-              <TableRow key={restaurant.id}>
-                <TableCell className="font-medium">{restaurant.name}</TableCell>
-                <TableCell>{restaurant.cuisine}</TableCell>
-                <TableCell>{restaurant.rating}</TableCell>
-                <TableCell>{restaurant.menuItems} items</TableCell>
-                <TableCell>{restaurant.orders}</TableCell>
-                <TableCell>${restaurant.revenue.toFixed(2)}</TableCell>
-                <TableCell>
-                  <Badge variant={restaurant.status === "active" ? "default" : "secondary"}>
-                    {restaurant.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" data-testid={`button-restaurant-menu-${restaurant.id}`}>
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setSelectedRestaurant(restaurant)}>
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Menu
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDeactivate(restaurant.id, restaurant.name)}>
-                        <Ban className="h-4 w-4 mr-2" />
-                        Deactivate
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center">
+                  Loading...
                 </TableCell>
               </TableRow>
-            ))}
+            ) : filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center">
+                  No restaurants found
+                </TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((restaurant: any) => (
+                <TableRow key={restaurant._id}>
+                  <TableCell className="font-medium">{restaurant.name}</TableCell>
+                  <TableCell>{restaurant.phone || "N/A"}</TableCell>
+                  <TableCell className="max-w-xs truncate">{restaurant.address || "N/A"}</TableCell>
+                  <TableCell>
+                    {restaurant.open_time || "--"} / {restaurant.close_time || "--"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={restaurant.is_active ? "default" : "secondary"}>
+                      {restaurant.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {restaurant.created_at
+                      ? new Date(restaurant.created_at).toLocaleDateString()
+                      : "N/A"}
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" data-testid={`button-restaurant-menu-${restaurant._id}`}>
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedRestaurant(restaurant);
+                            refetchDishes();
+                          }}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Menu
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDeactivate(restaurant._id, restaurant.name)}>
+                          <Ban className="h-4 w-4 mr-2" />
+                          Deactivate
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </Card>
@@ -153,17 +187,17 @@ export default function RestaurantManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dishes.map((dish) => (
-                    <TableRow key={dish.id} data-testid={`row-dish-${dish.id}`}>
+                  {dishes.map((dish: any) => (
+                    <TableRow key={dish._id || dish.id} data-testid={`row-dish-${dish._id || dish.id}`}>
                       <TableCell className="font-medium">{dish.name}</TableCell>
                       <TableCell className="max-w-xs truncate">{dish.description}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{dish.category}</Badge>
+                        <Badge variant="outline">{dish.category || "N/A"}</Badge>
                       </TableCell>
-                      <TableCell>${parseFloat(dish.price).toFixed(2)}</TableCell>
+                      <TableCell>${parseFloat(dish.price || 0).toFixed(2)}</TableCell>
                       <TableCell>
-                        <Badge variant={dish.isAvailable ? "default" : "secondary"}>
-                          {dish.isAvailable ? "Available" : "Unavailable"}
+                        <Badge variant={(dish.isAvailable ?? dish.is_available) ? "default" : "secondary"}>
+                          {(dish.isAvailable ?? dish.is_available) ? "Available" : "Unavailable"}
                         </Badge>
                       </TableCell>
                     </TableRow>

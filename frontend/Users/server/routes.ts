@@ -71,6 +71,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/restaurants", async (req, res) => {
+    try {
+      const base =
+        process.env.VITE_PRODUCT_API ||
+        process.env.PRODUCT_SERVICE_URL ||
+        "http://product-service:3003/api";
+      const params = new URLSearchParams();
+      if (req.query.owner_id) params.set("owner_id", req.query.owner_id as string);
+      if (req.query.is_active) params.set("is_active", req.query.is_active as string);
+      if (req.query.is_blocked) params.set("is_blocked", req.query.is_blocked as string);
+      const url = `${base.replace(/\/$/, "")}/restaurants${
+        params.toString() ? `?${params.toString()}` : ""
+      }`;
+
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (req.headers.authorization) {
+        headers.Authorization = req.headers.authorization as string;
+      }
+
+      const response = await fetch(url, { method: "GET", headers });
+      if (!response.ok) {
+        const text = await response.text();
+        return res.status(response.status).json({
+          error: "Failed to fetch restaurants",
+          upstreamStatus: response.status,
+          upstreamBody: text,
+          upstreamUrl: url,
+        });
+      }
+
+      const body = await response.json();
+      res.json(body);
+    } catch (error) {
+      console.error("Error fetching restaurants:", error);
+      res.status(500).json({
+        error: "Failed to fetch restaurants",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.get("/api/admin/restaurants/:id/dishes", async (req, res) => {
+    try {
+      const base =
+        process.env.VITE_PRODUCT_API ||
+        process.env.PRODUCT_SERVICE_URL ||
+        "http://product-service:3003/api";
+
+      const url = `${base.replace(/\/$/, "")}/dishes?restaurant_id=${req.params.id}`;
+
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (req.headers.authorization) {
+        headers.Authorization = req.headers.authorization as string;
+      }
+
+      const response = await fetch(url, { method: "GET", headers });
+      if (!response.ok) {
+        const text = await response.text();
+        return res.status(response.status).json({
+          error: "Failed to fetch dishes",
+          upstreamStatus: response.status,
+          upstreamBody: text,
+          upstreamUrl: url,
+        });
+      }
+
+      const body = await response.json();
+      res.json(body);
+    } catch (error) {
+      console.error("Error fetching dishes by restaurant:", error);
+      res.status(500).json({
+        error: "Failed to fetch dishes",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   app.patch("/api/admin/users/:id/active", async (req, res) => {
     try {
       const base =
