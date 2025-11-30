@@ -113,11 +113,11 @@ export default function OwnerDashboardOverview({
       }));
 
       const pending = normalized
-        .filter(({ normalizedStatus }) => PENDING_STATUSES.includes(normalizedStatus))
+        .filter(({ normalizedStatus }) => PENDING_STATUSES.includes(normalizedStatus as any))
         .map(({ order }) => order);
 
       const totalOrders = normalized.filter(({ normalizedStatus }) =>
-        TOTAL_ORDER_STATUSES.includes(normalizedStatus)
+        TOTAL_ORDER_STATUSES.includes(normalizedStatus as any)
       ).length;
 
       const todaysOrders = normalized.filter(
