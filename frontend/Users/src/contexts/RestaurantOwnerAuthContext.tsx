@@ -7,6 +7,7 @@ import {
 } from "react";
 import { getOwnerMe, loginOwner, registerOwner } from "@/api/auth";
 import { clearToken, getToken, setToken } from "@/api/client";
+import type { AxiosError } from "axios";
 import { jwtDecode } from "jwt-decode";
 
 interface RestaurantOwner {
@@ -67,20 +68,36 @@ export function RestaurantOwnerAuthProvider({ children }: { children: ReactNode 
     setOwner(mapped);
   };
 
-  const ownerLogin = async (username: string, password: string) => {
-    const response = await loginOwner({ email: username, password });
-    if (response.data?.token) {
-      setToken(response.data.token, { owner: true });
-      localStorage.setItem("owner_token", response.data.token);
-      const ownerId =
-        response.data?.user?.owner_id ||
-        response.data?.owner?._id ||
-        extractOwnerIdFromToken(response.data.token);
-      if (ownerId) {
-        localStorage.setItem("owner_id", ownerId);
+  const ownerLogin = async (email: string, password: string) => {
+    try {
+      const response = await loginOwner({ email, password });
+      if (response.data?.token) {
+        setToken(response.data.token, { owner: true });
+        localStorage.setItem("owner_token", response.data.token);
+        const ownerId =
+          response.data?.user?.owner_id ||
+          response.data?.owner?._id ||
+          extractOwnerIdFromToken(response.data.token);
+        if (ownerId) {
+          localStorage.setItem("owner_id", ownerId);
+        }
       }
+      syncOwnerState(response.data, email);
+    } catch (err) {
+      const axErr = err as AxiosError<any>;
+      const code = axErr?.response?.data?.code;
+      if (code === "OWNER_NOT_APPROVED" || code === "ACCOUNT_DEACTIVATED") {
+        const error: any = new Error(
+          code === "OWNER_NOT_APPROVED"
+            ? "Owner account not approved"
+            : "Account is deactivated"
+        );
+        error.code = code;
+        error.status = axErr?.response?.status;
+        throw error;
+      }
+      throw err;
     }
-    syncOwnerState(response.data, username);
   };
 
   const ownerRegister = async (data: Record<string, unknown>) => {

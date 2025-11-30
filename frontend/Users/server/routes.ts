@@ -71,6 +71,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/users/owners", async (req, res) => {
+    try {
+      const base =
+        process.env.VITE_USER_API_CUSTOMERS ||
+        process.env.USER_SERVICE_URL ||
+        "http://user-service:3001/api/users";
+      const params = new URLSearchParams();
+      if (req.query.page) params.set("page", req.query.page as string);
+      if (req.query.limit) params.set("limit", req.query.limit as string);
+      if (req.query.status) params.set("status", req.query.status as string);
+      const url = `${base.replace(/\/$/, "")}/owners${
+        params.toString() ? `?${params.toString()}` : ""
+      }`;
+
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (req.headers.authorization) {
+        headers.Authorization = req.headers.authorization as string;
+      }
+
+      const response = await fetch(url, { method: "GET", headers });
+      if (!response.ok) {
+        const text = await response.text();
+        return res.status(response.status).json({
+          error: "Failed to fetch owners",
+          upstreamStatus: response.status,
+          upstreamBody: text,
+          upstreamUrl: url,
+        });
+      }
+
+      const body = await response.json();
+      res.json(body);
+    } catch (error) {
+      console.error("Error fetching owners:", error);
+      res.status(500).json({
+        error: "Failed to fetch owners",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.patch("/api/admin/users/owners/:id/status", async (req, res) => {
+    try {
+      const base =
+        process.env.VITE_USER_API_CUSTOMERS ||
+        process.env.USER_SERVICE_URL ||
+        "http://user-service:3001/api/users";
+
+      const url = `${base.replace(/\/$/, "")}/owners/${req.params.id}/status`;
+
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (req.headers.authorization) {
+        headers.Authorization = req.headers.authorization as string;
+      }
+
+      const response = await fetch(url, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(req.body || {}),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        return res.status(response.status).json({
+          error: "Failed to update owner status",
+          upstreamStatus: response.status,
+          upstreamBody: text,
+          upstreamUrl: url,
+        });
+      }
+
+      const body = await response.json();
+      res.json(body);
+    } catch (error) {
+      console.error("Error updating owner status:", error);
+      res.status(500).json({
+        error: "Failed to update owner status",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   app.get("/api/admin/restaurants", async (req, res) => {
     try {
       const base =

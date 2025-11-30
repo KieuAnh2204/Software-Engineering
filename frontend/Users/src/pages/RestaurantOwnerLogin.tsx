@@ -24,10 +24,17 @@ export default function RestaurantOwnerLogin() {
         description: "Welcome to your restaurant portal",
       });
       setLocation("/owner");
-    } catch (error) {
+    } catch (error: any) {
+      const code = error?.code;
+      const description =
+        code === "OWNER_NOT_APPROVED"
+          ? "Your account is pending admin approval."
+          : code === "ACCOUNT_DEACTIVATED"
+          ? "Your account has been deactivated."
+          : "Invalid credentials";
       toast({
         title: "Login failed",
-        description: "Invalid credentials",
+        description,
         variant: "destructive",
       });
     }
@@ -46,9 +53,10 @@ export default function RestaurantOwnerLogin() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">Email</Label>
               <Input
                 id="username"
+                type="email"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required

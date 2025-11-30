@@ -41,10 +41,12 @@ import RestaurantManagement from "@/components/admin/RestaurantManagement";
 import OrderManagement from "@/components/admin/OrderManagement";
 import SystemLogs from "@/components/admin/SystemLogs";
 import ActivityLogs from "@/components/admin/ActivityLogs";
+import OwnerApprovals from "@/components/admin/OwnerApprovals";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", value: "dashboard" },
   { icon: Users, label: "Users", value: "users" },
+  { icon: Store, label: "Owners", value: "owners" },
   { icon: Store, label: "Restaurants", value: "restaurants" },
   { icon: ShoppingBag, label: "Orders", value: "orders" },
   { icon: FileText, label: "System Logs", value: "logs" },
@@ -157,6 +159,7 @@ export default function AdminDashboard() {
             <main className="flex-1 overflow-auto p-6">
               {activeView === "dashboard" && <DashboardOverview />}
               {activeView === "users" && <UserManagement />}
+              {activeView === "owners" && <OwnerApprovals />}
               {activeView === "restaurants" && <RestaurantManagement />}
               {activeView === "orders" && <OrderManagement />}
               {activeView === "logs" && <SystemLogs />}
