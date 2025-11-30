@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Search, MoreVertical, Ban, CheckCircle } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 type Customer = {
   _id: string;
@@ -30,12 +32,14 @@ type Customer = {
     _id: string;
     email?: string;
     username?: string;
+    isActive?: boolean;
     createdAt?: string;
   };
 };
 
 export default function UserManagement() {
   const [searchQuery, setSearchQuery] = useState("");
+  const { toast } = useToast();
 
   const { data, isLoading } = useQuery<{
     success?: boolean;
@@ -45,6 +49,25 @@ export default function UserManagement() {
   });
 
   const customers = useMemo(() => data?.data || [], [data]);
+
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      apiRequest("PATCH", `/api/admin/users/${id}/active`, { isActive }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users/customers"] });
+      toast({
+        title: "Success",
+        description: "User status updated",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update user status",
+        variant: "destructive",
+      });
+    },
+  });
 
   const filtered = customers.filter((c) => {
     const name = c.full_name || c.user?.username || "";
@@ -80,6 +103,7 @@ export default function UserManagement() {
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Address</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead className="w-12"></TableHead>
@@ -103,35 +127,48 @@ export default function UserManagement() {
                 const joinDate = customer.createdAt || customer.user?.createdAt;
                 const displayName = customer.full_name || customer.user?.username || "N/A";
                 const email = customer.user?.email || "N/A";
+                const isActive = customer.user?.isActive !== false;
                 return (
                   <TableRow key={customer._id}>
                     <TableCell className="font-medium">{displayName}</TableCell>
                     <TableCell>{email}</TableCell>
                     <TableCell>{customer.phone || "N/A"}</TableCell>
+                    <TableCell>
+                      <Badge variant={isActive ? "default" : "secondary"}>
+                        {isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
                     <TableCell>{customer.address || "N/A"}</TableCell>
                     <TableCell>
                       {joinDate ? new Date(joinDate).toLocaleDateString() : "N/A"}
                     </TableCell>
                     <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        data-testid={`button-user-menu-${customer._id}`}
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>
-                        <Ban className="h-4 w-4 mr-2" />
-                        Deactivate
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            data-testid={`button-user-menu-${customer._id}`}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() =>
+                              updateStatusMutation.mutate({
+                                id: customer._id,
+                                isActive: !isActive,
+                              })
+                            }
+                          >
+                            <Ban className="h-4 w-4 mr-2" />
+                            {isActive ? "Deactivate" : "Activate"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
             );
           })
         )}

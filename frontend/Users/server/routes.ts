@@ -71,6 +71,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/admin/users/:id/active", async (req, res) => {
+    try {
+      const base =
+        process.env.VITE_USER_API_CUSTOMERS ||
+        process.env.USER_SERVICE_URL ||
+        "http://user-service:3001/api/users";
+
+      const url = `${base.replace(/\/$/, "")}/${req.params.id}/active`;
+
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (req.headers.authorization) {
+        headers.Authorization = req.headers.authorization as string;
+      }
+
+      const response = await fetch(url, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ isActive: req.body?.isActive }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        return res.status(response.status).json({
+          error: "Failed to update user status",
+          upstreamStatus: response.status,
+          upstreamBody: text,
+          upstreamUrl: url,
+        });
+      }
+
+      const body = await response.json();
+      res.json(body);
+    } catch (error) {
+      console.error("Error updating user status:", error);
+      res.status(500).json({
+        error: "Failed to update user status",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   app.post("/api/auth/admin/login", async (req, res) => {
     try {
       const { username, password } = req.body;
