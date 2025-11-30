@@ -10,17 +10,14 @@ router.post('/payment/callback', order.paymentCallback);
 
 router.use(authenticate);
 
-<<<<<<< HEAD
 // Admin analytics
 router.get(
   '/admin/analytics/revenue',
   authorize('admin'),
   order.getAdminRevenueSummary
 );
-=======
 // direct order creation (without cart)
 router.post('/', order.createOrder);
->>>>>>> origin/beta30-11
 
 // cart
 router.get('/cart', cart.getCart);
