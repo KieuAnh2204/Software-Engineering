@@ -329,3 +329,90 @@ exports.updateRestaurantStatus = async (req, res, next) => {
   }
 };
 
+// Admin analytics: revenue and order summary across all restaurants
+exports.getAdminRevenueSummary = async (req, res, next) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const match = { status: 'completed' };
+
+    if (startDate || endDate) {
+      match.created_at = {};
+      if (startDate) {
+        const s = new Date(startDate);
+        if (!isNaN(s.getTime())) match.created_at.$gte = s;
+      }
+      if (endDate) {
+        const e = new Date(endDate);
+        if (!isNaN(e.getTime())) match.created_at.$lte = e;
+      }
+    }
+
+    const orders = await Order.find(match).lean();
+
+    const totalRevenue = orders.reduce(
+      (sum, order) => sum + (Number(order.total_amount) || 0),
+      0
+    );
+    const averageOrderValue =
+      orders.length > 0 ? totalRevenue / orders.length : 0;
+
+    const revenueByDateMap = new Map();
+    orders.forEach((order) => {
+      const dateSource =
+        order.completed_at ||
+        order.paid_at ||
+        order.updated_at ||
+        order.created_at ||
+        new Date();
+      const dateKey = new Date(dateSource).toISOString().split('T')[0];
+      const existing = revenueByDateMap.get(dateKey) || {
+        revenue: 0,
+        orderCount: 0,
+      };
+      existing.revenue += Number(order.total_amount) || 0;
+      existing.orderCount += 1;
+      revenueByDateMap.set(dateKey, existing);
+    });
+
+    const revenueByDate = Array.from(revenueByDateMap.entries())
+      .map(([date, data]) => ({
+        date,
+        revenue: data.revenue,
+        orderCount: data.orderCount,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const dishRevenue = new Map();
+    orders.forEach((order) => {
+      (order.items || []).forEach((item) => {
+        const key = item.productId || item.name || 'unknown';
+        const existing = dishRevenue.get(key) || {
+          dishId: item.productId || key,
+          dishName: item.name || 'Unknown',
+          orderCount: 0,
+          totalRevenue: 0,
+        };
+        const quantity = item.quantity || 1;
+        const price = Number(item.price) || 0;
+        existing.orderCount += quantity;
+        existing.totalRevenue += price * quantity;
+        dishRevenue.set(key, existing);
+      });
+    });
+
+    const popularDishes = Array.from(dishRevenue.values())
+      .sort((a, b) => b.orderCount - a.orderCount)
+      .slice(0, 5);
+
+    res.json({
+      totalRevenue,
+      totalOrders: orders.length,
+      averageOrderValue,
+      popularDishes,
+      revenueByDate,
+    });
+  } catch (e) {
+    next(e);
+  }
+};
+

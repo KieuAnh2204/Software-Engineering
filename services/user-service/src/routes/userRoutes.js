@@ -2,7 +2,8 @@ import express from 'express';
 import {
   getAllCustomers,
   getAllRestaurantOwners,
-  updateRestaurantOwnerStatus
+  updateRestaurantOwnerStatus,
+  updateUserActiveStatus
 } from '../controllers/userController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 
@@ -13,5 +14,6 @@ router.use(authenticate, authorize('admin'));
 router.get('/customers', getAllCustomers);
 router.get('/owners', getAllRestaurantOwners);
 router.patch('/owners/:id/status', updateRestaurantOwnerStatus);
+router.patch('/:id/active', updateUserActiveStatus);
 
 export default router;

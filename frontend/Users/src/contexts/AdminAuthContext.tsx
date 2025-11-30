@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { loginAdmin } from "@/api/auth";
+import { setToken, clearToken } from "@/api/client";
 
 interface AdminUser {
   id: string;
@@ -31,23 +32,30 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     }
   }, [admin]);
 
-  const adminLogin = async (username: string, password: string) => {
-    const response = await loginAdmin({ email: username, password });
+  const adminLogin = async (email: string, password: string) => {
+    const response = await loginAdmin({ email, password });
     const data = response.data;
     const adminPayload = data?.admin || data?.user || data;
+    const token = data?.token;
 
     const mapped: AdminUser = {
-      id: adminPayload?.id || adminPayload?._id || username,
-      username: adminPayload?.username || username,
-      email: adminPayload?.email || `${adminPayload?.username || username}@foodfast.com`,
+      id: adminPayload?.id || adminPayload?._id || email,
+      username: adminPayload?.username || email,
+      email: adminPayload?.email || email,
       role: adminPayload?.role === "superadmin" ? "superadmin" : "admin",
     };
 
+    // Ensure owner tokens don't override admin calls
+    clearToken({ owner: true });
     setAdmin(mapped);
+    if (token) {
+      setToken(token);
+    }
   };
 
   const adminLogout = () => {
     console.log("Admin logout");
+    clearToken();
     setAdmin(null);
   };
 

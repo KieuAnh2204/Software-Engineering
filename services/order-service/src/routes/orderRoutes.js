@@ -10,6 +10,13 @@ router.post('/payment/callback', order.paymentCallback);
 
 router.use(authenticate);
 
+// Admin analytics
+router.get(
+  '/admin/analytics/revenue',
+  authorize('admin'),
+  order.getAdminRevenueSummary
+);
+
 // cart
 router.get('/cart', cart.getCart);
 router.post('/cart/items', cart.addItem);

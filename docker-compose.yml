@@ -99,7 +99,9 @@ services:
       - ./frontend:/app
     environment:
       - VITE_USER_API=http://localhost:3001/api/auth
-      - VITE_PRODUCT_API=http://localhost:3003/api
+      - VITE_USER_API_CUSTOMERS=http://user-service:3001/api/users
+      - VITE_PRODUCT_API=http://product-service:3003/api
+      - VITE_ORDER_API=http://order-service:3002/api/orders
       - NODE_ENV=development
     ports:
       - "5000:5000"

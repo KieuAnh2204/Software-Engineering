@@ -30,6 +30,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/users/customers", async (req, res) => {
+    try {
+      const base =
+        process.env.VITE_USER_API_CUSTOMERS ||
+        process.env.USER_SERVICE_URL ||
+        "http://user-service:3001/api/users" || // docker service name
+        "http://localhost:3001/api/users";
+      const params = new URLSearchParams();
+      if (req.query.page) params.set("page", req.query.page as string);
+      if (req.query.limit) params.set("limit", req.query.limit as string);
+      const url = `${base.replace(/\/$/, "")}/customers${
+        params.toString() ? `?${params.toString()}` : ""
+      }`;
+
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (req.headers.authorization) {
+        headers.Authorization = req.headers.authorization;
+      }
+
+      const response = await fetch(url, { method: "GET", headers });
+      if (!response.ok) {
+        const text = await response.text();
+        return res.status(response.status).json({
+          error: "Failed to fetch customers",
+          upstreamStatus: response.status,
+          upstreamBody: text,
+          upstreamUrl: url,
+        });
+      }
+
+      const body = await response.json();
+      res.json(body);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      res.status(500).json({
+        error: "Failed to fetch customers",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   app.post("/api/auth/admin/login", async (req, res) => {
     try {
       const { username, password } = req.body;
@@ -159,14 +200,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/analytics/revenue", async (req, res) => {
     try {
       const { startDate, endDate } = req.query;
-      const start = startDate ? new Date(startDate as string) : undefined;
-      const end = endDate ? new Date(endDate as string) : undefined;
-      
-      const summary = await storage.getRevenueSummary(start, end);
+      const base =
+        process.env.VITE_ORDER_API ||
+        process.env.ORDER_SERVICE_URL ||
+        "http://order-service:3002/api/orders"; // docker/local-network fallback
+      const params = new URLSearchParams();
+      if (startDate) params.set("startDate", startDate as string);
+      if (endDate) params.set("endDate", endDate as string);
+      const url = `${base.replace(/\/$/, "")}/admin/analytics/revenue${
+        params.toString() ? `?${params.toString()}` : ""
+      }`;
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (req.headers.authorization) {
+        headers.Authorization = req.headers.authorization;
+      }
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        return res
+          .status(response.status)
+          .json({
+            error: "Failed to fetch revenue summary",
+            upstreamStatus: response.status,
+            upstreamBody: text,
+            upstreamUrl: url,
+          });
+      }
+
+      const summary = await response.json();
       res.json(summary);
     } catch (error) {
       console.error("Error fetching revenue summary:", error);
-      res.status(500).json({ error: "Failed to fetch revenue summary" });
+      res.status(500).json({
+        error: "Failed to fetch revenue summary",
+        details: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 

@@ -297,6 +297,9 @@ export const loginCustomer = async (req, res, next) => {
 
     const user = await User.findOne({ email, role: 'customer' }).select('+password');
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+    if (user.isActive === false) {
+      return res.status(403).json({ message: 'Account is deactivated', code: 'ACCOUNT_DEACTIVATED' });
+    }
 
     const match = await user.comparePassword(password);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
@@ -326,6 +329,9 @@ export const loginRestaurantOwner = async (req, res, next) => {
 
     const user = await User.findOne({ email, role: 'owner' }).select('+password');
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+    if (user.isActive === false) {
+      return res.status(403).json({ message: 'Account is deactivated', code: 'ACCOUNT_DEACTIVATED' });
+    }
 
     const match = await user.comparePassword(password);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
@@ -355,6 +361,9 @@ export const loginAdmin = async (req, res, next) => {
 
     const user = await User.findOne({ email, role: 'admin' }).select('+password');
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+    if (user.isActive === false) {
+      return res.status(403).json({ message: 'Account is deactivated', code: 'ACCOUNT_DEACTIVATED' });
+    }
 
     const match = await user.comparePassword(password);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });

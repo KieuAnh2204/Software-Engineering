@@ -33,10 +33,15 @@ export default function Login() {
         description: "Welcome back!",
       });
       setLocation("/");
-    } catch (error) {
+    } catch (error: any) {
+      const code = error?.code;
+      const message =
+        code === "ACCOUNT_DEACTIVATED"
+          ? "Your account has been deactivated. Please contact support."
+          : "Invalid email or password";
       toast({
         title: "Login failed",
-        description: "Invalid email or password",
+        description: message,
         variant: "destructive",
       });
     }
