@@ -1,5 +1,33 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { getToken } from "@/api/client";
+
+const safeGetLocalStorage = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const resolveAuthToken = (url: string): string | null => {
+  const token = safeGetLocalStorage("token");
+  const ownerToken = safeGetLocalStorage("owner_token");
+
+  // Prefer admin/customer token for admin endpoints; otherwise allow owner token first
+  const path = (() => {
+    try {
+      if (url.startsWith("http")) return new URL(url).pathname;
+    } catch {
+      // ignore URL parse errors
+    }
+    return url.startsWith("/") ? url : `/${url}`;
+  })();
+
+  if (path.startsWith("/api/admin")) {
+    return token || null;
+  }
+
+  return ownerToken || token || null;
+};
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -13,7 +41,7 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const token = getToken();
+  const token = resolveAuthToken(url);
   const headers: Record<string, string> = {};
   if (data) headers["Content-Type"] = "application/json";
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -35,12 +63,13 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const token = getToken();
+    const url = queryKey.join("/") as string;
+    const token = resolveAuthToken(url);
     const headers = token
       ? { Authorization: `Bearer ${token}` }
       : undefined;
 
-    const res = await fetch(queryKey.join("/") as string, {
+    const res = await fetch(url, {
       credentials: "include",
       headers,
     });

@@ -74,8 +74,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/restaurants", async (req, res) => {
     try {
       const base =
-        process.env.VITE_PRODUCT_API ||
         process.env.PRODUCT_SERVICE_URL ||
+        process.env.VITE_PRODUCT_API ||
         "http://product-service:3003/api";
       const params = new URLSearchParams();
       if (req.query.owner_id) params.set("owner_id", req.query.owner_id as string);
@@ -115,8 +115,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/restaurants/:id/dishes", async (req, res) => {
     try {
       const base =
-        process.env.VITE_PRODUCT_API ||
         process.env.PRODUCT_SERVICE_URL ||
+        process.env.VITE_PRODUCT_API ||
         "http://product-service:3003/api";
 
       const url = `${base.replace(/\/$/, "")}/dishes?restaurant_id=${req.params.id}`;
@@ -319,8 +319,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { startDate, endDate } = req.query;
       const base =
-        process.env.VITE_ORDER_API ||
         process.env.ORDER_SERVICE_URL ||
+        process.env.VITE_ORDER_API ||
         "http://order-service:3002/api/orders"; // docker/local-network fallback
       const params = new URLSearchParams();
       if (startDate) params.set("startDate", startDate as string);
