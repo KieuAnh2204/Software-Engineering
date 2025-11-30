@@ -38,7 +38,7 @@ const restaurantSchema = new mongoose.Schema({
   },
   is_active: {
     type: Boolean,
-    default: true
+    default: false
   },
   is_blocked: {
     type: Boolean,

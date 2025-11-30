@@ -21,7 +21,8 @@ exports.createRestaurant = async (req, res) => {
       logo_url: logo_url || null,
       open_time: open_time || null,
       close_time: close_time || null,
-      is_active: req.body.is_active !== undefined ? req.body.is_active : true,
+      // New restaurants must be approved by admin before going active
+      is_active: false,
       is_blocked: req.body.is_blocked !== undefined ? req.body.is_blocked : false
     });
 

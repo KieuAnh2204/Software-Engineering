@@ -148,6 +148,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/admin/restaurants/:id/status", async (req, res) => {
+    try {
+      const base =
+        process.env.VITE_PRODUCT_API ||
+        process.env.PRODUCT_SERVICE_URL ||
+        "http://product-service:3003/api";
+
+      const url = `${base.replace(/\/$/, "")}/restaurants/${req.params.id}/status`;
+
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (req.headers.authorization) {
+        headers.Authorization = req.headers.authorization as string;
+      }
+
+      const response = await fetch(url, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(req.body || {}),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        return res.status(response.status).json({
+          error: "Failed to update restaurant status",
+          upstreamStatus: response.status,
+          upstreamBody: text,
+          upstreamUrl: url,
+        });
+      }
+
+      const body = await response.json();
+      res.json(body);
+    } catch (error) {
+      console.error("Error updating restaurant status:", error);
+      res.status(500).json({
+        error: "Failed to update restaurant status",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   app.patch("/api/admin/users/:id/active", async (req, res) => {
     try {
       const base =

@@ -336,14 +336,21 @@ export const loginRestaurantOwner = async (req, res, next) => {
     const match = await user.comparePassword(password);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
 
-    await User.findByIdAndUpdate(user._id, { lastLogin: new Date() });
-
-    const owner = await ensureOwnerProfile({
+    const ownerProfile = await ensureOwnerProfile({
       userId: user._id,
       profile: { username: user.username }
     });
+    if (!ownerProfile || ownerProfile.status !== 'APPROVED') {
+      return res.status(403).json({
+        message: 'Owner account not approved yet',
+        code: 'OWNER_NOT_APPROVED',
+        status: ownerProfile?.status || 'PENDING'
+      });
+    }
 
-    respondWithAuthPayload(res, user, 'owner', owner, 'Login successful', 200);
+    await User.findByIdAndUpdate(user._id, { lastLogin: new Date() });
+
+    respondWithAuthPayload(res, user, 'owner', ownerProfile, 'Login successful', 200);
   } catch (error) {
     next(error);
   }

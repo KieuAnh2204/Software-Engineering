@@ -26,8 +26,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function RestaurantManagement() {
   const { toast } = useToast();
@@ -52,11 +52,27 @@ export default function RestaurantManagement() {
   const dishes = dishesResponse?.data || [];
 
   const handleDeactivate = (restaurantId: string, restaurantName: string) => {
-    toast({
-      title: "Deactivate Restaurant",
-      description: `Deactivate feature for ${restaurantName} will be implemented soon.`,
-    });
+    statusMutation.mutate({ id: restaurantId, is_active: false, restaurantName });
   };
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
+      apiRequest("PATCH", `/api/admin/restaurants/${id}/status`, { is_active }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/restaurants"] });
+      toast({
+        title: "Success",
+        description: "Restaurant status updated",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update restaurant status",
+        variant: "destructive",
+      });
+    },
+  });
 
   const filtered = restaurants.filter((r: any) => {
     const q = searchQuery.toLowerCase();
@@ -144,9 +160,16 @@ export default function RestaurantManagement() {
                           <Eye className="h-4 w-4 mr-2" />
                           View Menu
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeactivate(restaurant._id, restaurant.name)}>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            statusMutation.mutate({
+                              id: restaurant._id,
+                              is_active: !restaurant.is_active,
+                            })
+                          }
+                        >
                           <Ban className="h-4 w-4 mr-2" />
-                          Deactivate
+                          {restaurant.is_active ? "Deactivate" : "Activate"}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
