@@ -90,6 +90,20 @@ services:
     networks:
       - app-network
 
+  pay-service:
+    build:
+      context: ./services/pay-service
+      dockerfile: Dockerfile
+    container_name: pay-service
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+    networks:
+      - app-network
+
   drone-service:
     build:
       context: ./services/drone-service
