@@ -5,6 +5,7 @@ import {
   ShoppingBag,
   Users,
   FileText,
+  MapPinned,
   LogOut,
   Menu as MenuIcon,
   X,
@@ -41,12 +42,15 @@ import RestaurantManagement from "@/components/admin/RestaurantManagement";
 import OrderManagement from "@/components/admin/OrderManagement";
 import SystemLogs from "@/components/admin/SystemLogs";
 import ActivityLogs from "@/components/admin/ActivityLogs";
+import DronesManagement from "@/components/admin/DronesManagement";
+
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", value: "dashboard" },
   { icon: Users, label: "Users", value: "users" },
   { icon: Store, label: "Restaurants", value: "restaurants" },
   { icon: ShoppingBag, label: "Orders", value: "orders" },
+  { icon: MapPinned, label: "Drones", value: "drones" },
   { icon: FileText, label: "System Logs", value: "logs" },
   { icon: FileText, label: "Activity Logs", value: "activity" },
 ];
@@ -159,6 +163,7 @@ export default function AdminDashboard() {
               {activeView === "users" && <UserManagement />}
               {activeView === "restaurants" && <RestaurantManagement />}
               {activeView === "orders" && <OrderManagement />}
+              {activeView === "drones" && <DronesManagement />}
               {activeView === "logs" && <SystemLogs />}
               {activeView === "activity" && <ActivityLogs />}
             </main>

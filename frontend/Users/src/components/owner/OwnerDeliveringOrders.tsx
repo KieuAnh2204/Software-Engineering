@@ -280,6 +280,9 @@ export default function OwnerDeliveringOrders() {
               segment="delivery"
               durationMs={10000}
               persistKey={trackingOrderId}
+              displayDroneId={
+                orders.find((o) => (o._id || o.id) === trackingOrderId)?.assigned_drone_id
+              }
               restaurantLocation={getFixedRestaurantLocation(restaurantId)}
               customerLocation={
                 orders.find((o) => (o._id || o.id) === trackingOrderId)?.customer_location ||

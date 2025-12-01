@@ -25,6 +25,7 @@ type Props = {
   segment?: Segment;
   durationMs?: number;
   persistKey?: string;
+  displayDroneId?: string;
 };
 
 type Position = {
@@ -79,6 +80,7 @@ export default function TrackDrone({
   segment = "delivery",
   durationMs = 10000,
   persistKey,
+  displayDroneId,
 }: Props) {
   const [mapReady, setMapReady] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
@@ -275,7 +277,7 @@ export default function TrackDrone({
       </div>
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span className="font-medium">
-          Drone {position?.droneId || "SIM"} — {position?.status || "initializing"}
+          Drone {displayDroneId || position?.droneId || "SIM"} — {position?.status || "initializing"}
         </span>
         {position?.battery !== undefined && (
           <span className="font-mono">Battery: {Math.round(position.battery)}%</span>

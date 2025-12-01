@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import TrackDrone from "@/components/TrackDrone";
 import { formatVND } from "@/lib/currency";
+import { getFixedRestaurantLocation } from "@/lib/restaurantLocations";
 
 const ORDER_API = import.meta.env?.VITE_ORDER_API ?? "http://localhost:3002/api/orders";
 const RESTAURANT_FALLBACK = { lng: 106.7009, lat: 10.7769 };
@@ -20,6 +21,11 @@ type Order = {
   total_amount?: number;
   long_address?: string;
   pin_code?: string;
+  assigned_drone_id?: string;
+  restaurant_id?: string;
+  customer_address?: string;
+  customerAddress?: string;
+  customer_location?: { lat: number; lng: number };
 };
 
 export default function TrackDeliveryPage() {
@@ -89,12 +95,26 @@ export default function TrackDeliveryPage() {
               <TrackDrone
                 orderId={orderId}
                 height={580}
+                displayDroneId={order?.assigned_drone_id}
                 onArrival={() => setDroneArrived(true)}
                 onPositionChange={(pos) => {
                   setDroneStatus(pos.status);
                   setDroneId(pos.droneId);
                   if (pos.arrivedAtCustomer) setDroneArrived(true);
                 }}
+                restaurantLocation={(() => {
+                  const rid = order?.restaurant_id;
+                  if (rid) return getFixedRestaurantLocation(rid);
+                  return { lat: 10.7769, lng: 106.7009 };
+                })()}
+                customerLocation={(() => {
+                  if (order?.customer_location) return order.customer_location;
+                  try {
+                    const raw = localStorage.getItem(`order-customer-location-${orderId}`);
+                    if (raw) return JSON.parse(raw);
+                  } catch {}
+                  return { lat: 10.8231, lng: 106.6297 };
+                })()}
               />
             </CardContent>
           </Card>
@@ -116,14 +136,14 @@ export default function TrackDeliveryPage() {
 
                 <div className="flex justify-between items-start">
                   <span className="text-sm text-muted-foreground">Drone ID</span>
-                  <span className="text-sm font-medium">{droneId || "Assigning..."}</span>
+                  <span className="text-sm font-medium">{order?.assigned_drone_id || droneId || "Assigning..."}</span>
                 </div>
 
                 <Separator />
 
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Destination</p>
-                  <p className="text-sm font-medium">{order?.long_address || "Updating..."}</p>
+                  <p className="text-sm font-medium">{order?.long_address || order?.customer_address || order?.customerAddress || "Updating..."}</p>
                 </div>
 
                 <Separator />

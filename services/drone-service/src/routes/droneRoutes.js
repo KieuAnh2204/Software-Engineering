@@ -19,4 +19,8 @@ router.post('/verify-pin', controller.verifyPin);
 router.get('/', controller.listDrones);
 router.get('/:id', controller.getDroneById);
 
+// Admin
+router.get('/stations/list', controller.listStations);
+router.post('/', controller.createDrone);
+
 module.exports = router;

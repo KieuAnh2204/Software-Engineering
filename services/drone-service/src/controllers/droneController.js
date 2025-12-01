@@ -65,7 +65,7 @@ const moveTowardTarget = (drone) => {
 
 const handleArrival = (drone) => {
   if (drone.status === 'pickup') {
-    drone.status = 'waiting_at_restaurant';
+    // Arrived at restaurant: keep status as 'pickup', just clear target.
     drone.targetLat = null;
     drone.targetLng = null;
   } else if (drone.status === 'delivering') {
@@ -200,55 +200,38 @@ exports.assignDrone = async (req, res) => {
         message: 'orderId, restaurantLat and restaurantLng are required',
       });
     }
-    // Always create a new dedicated drone instance for this order instead of reusing an available one.
-    // Select nearest station to restaurant for initial spawn.
-    let chosenStation = STATIONS[0];
-    let minDist = distanceInMeters(restaurantLat, restaurantLng, chosenStation.lat, chosenStation.lng);
-    for (let i = 1; i < STATIONS.length; i++) {
-      const st = STATIONS[i];
-      const dist = distanceInMeters(restaurantLat, restaurantLng, st.lat, st.lng);
-      if (dist < minDist) {
-        minDist = dist;
-        chosenStation = st;
-      }
+    // Select an existing available drone nearest to restaurant
+    const nearest = await selectNearestDrone(Number(restaurantLat), Number(restaurantLng));
+    if (!nearest) {
+      return res.status(404).json({ success: false, message: 'No available drones' });
     }
 
-    const droneId = `DRN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const drone = new Drone({
-      droneId,
-      station: chosenStation.name,
-      lat: chosenStation.lat,
-      lng: chosenStation.lng,
-      status: 'pickup',
-      orderId,
-      restaurantLat: Number(restaurantLat),
-      restaurantLng: Number(restaurantLng),
-      customerLat: customerLat ?? HCM_CENTER.lat,
-      customerLng: customerLng ?? HCM_CENTER.lng,
-      pinCode: pinCode || '',
-      targetLat: Number(restaurantLat),
-      targetLng: Number(restaurantLng),
-      arrivedAtCustomer: false,
-      unlocked: false,
-      speed: 18,
-      battery: 100,
-      lastUpdate: new Date(),
-    });
-
-    await drone.save();
+    nearest.status = 'pickup';
+    nearest.orderId = orderId;
+    nearest.restaurantLat = Number(restaurantLat);
+    nearest.restaurantLng = Number(restaurantLng);
+    nearest.customerLat = customerLat ?? HCM_CENTER.lat;
+    nearest.customerLng = customerLng ?? HCM_CENTER.lng;
+    nearest.pinCode = pinCode || '';
+    nearest.targetLat = Number(restaurantLat);
+    nearest.targetLng = Number(restaurantLng);
+    nearest.arrivedAtCustomer = false;
+    nearest.unlocked = false;
+    nearest.lastUpdate = new Date();
+    await nearest.save();
 
     res.json({
       success: true,
       message: 'Drone assigned and flying to restaurant',
       drone: {
-        id: drone._id,
-        droneId: drone.droneId,
-        station: drone.station,
-        status: drone.status,
-        lat: drone.lat,
-        lng: drone.lng,
-        targetLat: drone.targetLat,
-        targetLng: drone.targetLng,
+        id: nearest._id,
+        droneId: nearest.droneId,
+        station: nearest.station,
+        status: nearest.status,
+        lat: nearest.lat,
+        lng: nearest.lng,
+        targetLat: nearest.targetLat,
+        targetLng: nearest.targetLng,
       },
     });
   } catch (error) {
@@ -269,7 +252,7 @@ exports.startDelivery = async (req, res) => {
       return res.status(404).json({ success: false, message: 'No drone assigned to this order' });
     }
 
-    if (drone.status !== 'waiting_at_restaurant' && drone.status !== 'pickup') {
+    if (drone.status !== 'pickup') {
       return res.status(400).json({
         success: false,
         message: `Drone cannot start delivery from status ${drone.status}`,
@@ -419,6 +402,52 @@ exports.getDroneById = async (req, res) => {
     res.json({ success: true, data: drone });
   } catch (error) {
     console.error('Error fetching drone:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Admin helpers
+exports.listStations = async (_req, res) => {
+  try {
+    res.json({ success: true, data: STATIONS });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.createDrone = async (req, res) => {
+  try {
+    const { droneId, station, status, lat, lng, battery } = req.body || {};
+
+    if (!droneId || !station) {
+      return res.status(400).json({ success: false, message: 'droneId and station are required' });
+    }
+
+    const stationInfo = STATIONS.find((s) => s.name === station);
+    if (!stationInfo) {
+      return res.status(400).json({ success: false, message: 'Invalid station' });
+    }
+
+    const exists = await Drone.findOne({ droneId });
+    if (exists) {
+      return res.status(409).json({ success: false, message: 'droneId already exists' });
+    }
+
+    const allowedStatuses = ['available', 'pickup', 'delivering', 'returning'];
+    const safeStatus = allowedStatuses.includes(status) ? status : 'available';
+
+    const doc = await Drone.create({
+      droneId,
+      station: stationInfo.name,
+      lat: lat ?? stationInfo.lat,
+      lng: lng ?? stationInfo.lng,
+      status: safeStatus,
+      battery: battery ?? 100,
+    });
+
+    res.status(201).json({ success: true, data: doc });
+  } catch (error) {
+    console.error('Error creating drone:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

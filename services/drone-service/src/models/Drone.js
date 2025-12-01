@@ -7,7 +7,7 @@ const DroneSchema = new mongoose.Schema(
     lng: { type: Number, required: true, default: 106.6297 },
     status: {
       type: String,
-      enum: ['available', 'pickup', 'waiting_at_restaurant', 'delivering', 'returning'],
+      enum: ['available', 'pickup', 'delivering', 'returning'],
       default: 'available',
       index: true,
     },

@@ -17,7 +17,7 @@ services:
     container_name: user-service
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "3007:3001"
     environment:
       - NODE_ENV=development
       - PORT=3001
@@ -110,13 +110,13 @@ services:
     image: node:20
     container_name: frontend
     working_dir: /app/Users
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5000"
+    command: sh -c "rm -rf node_modules && npm install && npm run dev"
     volumes:
       - ./frontend:/app
     environment:
-      - VITE_USER_API_CUSTOMERS=http://user-service:3001/api/users
-      - PRODUCT_SERVICE_URL=http://product-service:3003/api
-      - ORDER_SERVICE_URL=http://order-service:3002/api/orders
+      - VITE_USER_API=http://localhost:3007/api/auth
+      - PRODUCT_SERVICE_URL=http://localhost:3003/api
+      - ORDER_SERVICE_URL=http://localhost:3002/api/orders
       - VITE_PRODUCT_API=http://localhost:3003/api
       - VITE_ORDER_API=http://localhost:3002/api/orders
       - VITE_DRONE_API=http://localhost:3006/api/drones
