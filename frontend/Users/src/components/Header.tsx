@@ -2,10 +2,8 @@ import { useState } from "react";
 import { ShoppingCart, User, MapPin, LogOut, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
-import { useCart } from "@/contexts/CartContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +18,6 @@ export function Header() {
   const [location, setLocation] = useLocation();
   const isRestaurant = location.startsWith("/restaurant");
   const { user, isAuthenticated, logout } = useAuth();
-  const { itemCount } = useCart();
   const [addressDialogOpen, setAddressDialogOpen] = useState(false);
 
   const handleLogout = () => {
@@ -55,15 +52,9 @@ export function Header() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="relative"
                   data-testid="button-cart"
                 >
                   <ShoppingCart className="h-5 w-5" />
-                  {itemCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
-                      {itemCount}
-                    </Badge>
-                  )}
                 </Button>
               </Link>
               {isAuthenticated ? (

@@ -60,7 +60,7 @@ services:
       - MONGODB_URI=mongodb+srv://foodfast_delivery:foodfast_delivery@cluster0.r3lhqwd.mongodb.net/order_service?retryWrites=true&w=majority&appName=Cluster0
       - JWT_SECRET=2ff1011a2f5e65f72b80d9a0667a942b388bab6dc4637f681118a571b07b00474
       - PRODUCT_SERVICE_URL=http://product-service:3003
-      - PAYMENT_SERVICE_URL=http://payment-service:3004
+      - PAYMENT_SERVICE_URL=http://payment-service:3000
       - PAYMENT_WEBHOOK_SECRET=payment-webhook-secret
     depends_on:
       - user-service
@@ -87,6 +87,28 @@ services:
       - VNPAY_PAYMENT_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
       - VNPAY_RETURN_URL=http://localhost:3004/api/payments/vnpay/return
       - VNPAY_IPN_URL=http://localhost:3004/api/payments/vnpay/ipn
+    networks:
+      - app-network
+
+  pay-service:
+    build:
+      context: ./services/pay-service
+      dockerfile: Dockerfile
+    container_name: pay-service
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - ORDER_SERVICE_URL=http://order-service:3002
+      - PAYMENT_WEBHOOK_SECRET=payment-webhook-secret
+      - VNPAY_TMN_CODE=YBI06X9N
+      - VNPAY_HASH_SECRET=VSKKEZZP1UU9D5OB5D7ABG1XAVO1D2N7
+      - VNPAY_PAYMENT_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+      - VNPAY_RETURN_URL=http://localhost:3000/api/check-payment-vnpay
+      - FRONTEND_RETURN_URL=http://localhost:5000/payment/vnpay/return
+      - ALLOWED_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
     networks:
       - app-network
 
@@ -120,6 +142,7 @@ services:
       - VITE_PRODUCT_API=http://localhost:3003/api
       - VITE_ORDER_API=http://localhost:3002/api/orders
       - VITE_DRONE_API=http://localhost:3006/api/drones
+      - VITE_PAY_SERVICE_API=http://localhost:3000/api
       - NODE_ENV=development
     ports:
       - "5000:5000"
