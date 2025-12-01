@@ -1,5 +1,6 @@
 const express = require('express');
 const axios = require('axios');
+const cors = require('cors');
 const {
   VNPay,
   ignoreLogger,
@@ -18,7 +19,14 @@ const {
   VNPAY_HASH_SECRET = '',
   VNPAY_PAYMENT_URL = 'https://sandbox.vnpayment.vn',
   VNPAY_RETURN_URL = 'http://localhost:3000/api/check-payment-vnpay',
+  FRONTEND_RETURN_URL = '',
+  ALLOWED_ORIGINS = 'http://localhost:5000,http://127.0.0.1:5000',
 } = process.env;
+
+const corsOrigins = (ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 const vnpay = new VNPay({
   tmnCode: VNPAY_TMN_CODE,
@@ -30,6 +38,21 @@ const vnpay = new VNPay({
 });
 
 app.use(express.json());
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true); // allow same-origin / curl
+      if (corsOrigins.length === 0 || corsOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    optionsSuccessStatus: 204,
+  })
+);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', service: 'pay-service' });
@@ -120,8 +143,8 @@ app.post('/api/create-qr', async (req, res) => {
       req.socket?.remoteAddress ||
       '127.0.0.1';
 
-    // VNPay multiplies internally by 100; divide here to avoid double-scaling (e.g., 36000 -> 360 -> VNPay shows 36000)
-    const vnpAmount = Math.max(1, Math.round(amount / 100));
+    // With the current VNPay SDK, pass the raw VND amount (no extra scaling) to avoid 100x inflation.
+    const vnpAmount = Math.max(1, Math.round(amount));
 
     const vnpayResponse = await vnpay.buildPaymentUrl({
       vnp_Amount: vnpAmount,
@@ -178,6 +201,16 @@ app.get('/api/check-payment-vnpay', async (req, res) => {
       return res
         .status(502)
         .json({ message: 'Failed to notify order-service', status });
+    }
+
+    if (FRONTEND_RETURN_URL) {
+      const target = appendQuery(FRONTEND_RETURN_URL, {
+        orderId,
+        status,
+        transactionId: transactionId || '',
+        vnp_ResponseCode: req.query.vnp_ResponseCode || '',
+      });
+      return res.redirect(302, target);
     }
 
     return res.status(200).json({
