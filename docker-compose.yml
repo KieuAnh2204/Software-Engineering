@@ -101,6 +101,12 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3000
+      - ORDER_SERVICE_URL=http://order-service:3002
+      - PAYMENT_WEBHOOK_SECRET=payment-webhook-secret
+      - VNPAY_TMN_CODE=YBI06X9N
+      - VNPAY_HASH_SECRET=VSKKEZZP1UU9D5OB5D7ABG1XAVO1D2N7
+      - VNPAY_PAYMENT_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+      - VNPAY_RETURN_URL=http://pay-service:3000/api/check-payment-vnpay
     networks:
       - app-network
 
