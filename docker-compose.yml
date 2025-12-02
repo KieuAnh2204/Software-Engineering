@@ -132,13 +132,14 @@ services:
     image: node:20
     container_name: frontend
     working_dir: /app/Users
-    command: sh -c "rm -rf node_modules && npm install && npm run dev"
+    command: sh -c "rm -rf node_modules && npm install && npm run dev:server"
     volumes:
       - ./frontend:/app
     environment:
       - VITE_USER_API=http://localhost:3007/api/auth
-      - PRODUCT_SERVICE_URL=http://localhost:3003/api
-      - ORDER_SERVICE_URL=http://localhost:3002/api/orders
+      - PRODUCT_SERVICE_URL=http://product-service:3003/api
+      - ORDER_SERVICE_URL=http://order-service:3002/api/orders
+      - USER_SERVICE_URL=http://user-service:3001/api/users
       - VITE_PRODUCT_API=http://localhost:3003/api
       - VITE_ORDER_API=http://localhost:3002/api/orders
       - VITE_DRONE_API=http://localhost:3006/api/drones
