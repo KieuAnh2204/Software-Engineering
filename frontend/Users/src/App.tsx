@@ -33,7 +33,6 @@ import ApiTestPage from "@/pages/ApiTestPage";
 import OrderStatus from "@/pages/OrderStatus";
 import TrackDeliveryPage from "@/pages/TrackDeliveryPage";
 import OrderPinPage from "@/pages/OrderPinPage";
-import VnpayReturn from "@/pages/VnpayReturn";
 
 function Router() {
   return (
@@ -60,7 +59,6 @@ function Router() {
       <Route path="/track/:orderId" component={TrackDeliveryPage} />
       <Route path="/order-pin/:orderId" component={OrderPinPage} />
       <Route path="/drone/verify/:orderId" component={OrderPinPage} />
-      <Route path="/payment/vnpay/return" component={VnpayReturn} />
       <Route component={NotFound} />
     </Switch>
   );

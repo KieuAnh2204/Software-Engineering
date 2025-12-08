@@ -17,7 +17,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { formatVND } from "@/lib/currency";
 
 const ORDER_API = import.meta.env?.VITE_ORDER_API ?? "http://localhost:3002/api/orders";
-const PAY_API = import.meta.env?.VITE_PAY_SERVICE_API ?? "http://localhost:3000/api";
 
 type PaymentMethod = "vnpay";
 
@@ -171,21 +170,18 @@ export default function Checkout() {
       const order = orderRes.data?.order || orderRes.data;
       if (!order?._id) throw new Error("Order not created");
 
-      // 2) Create VNPay payment link and redirect user
-      const payRes = await axios.post(
-        `${PAY_API}/create-qr`,
-        { orderId: order._id },
+      // 2) Mark paid (simulate VNPAY success) so kitchen can start
+      await axios.post(
+        `${ORDER_API}/${order._id}/mock-pay`,
+        {},
         { headers: getAuthHeader() }
       );
-      const paymentUrl = payRes.data?.paymentUrl;
-      if (!paymentUrl) throw new Error("Payment URL not returned");
 
       toast({
-        title: "Redirecting to payment",
-        description: "Please complete payment to confirm your order.",
+        title: "Order placed",
+        description: "Your order has been submitted and marked as paid.",
       });
-
-      window.location.href = paymentUrl;
+      setLocation(`/order-status/${order._id}`);
     } catch (error: any) {
       console.error("Checkout error", error);
       toast({
