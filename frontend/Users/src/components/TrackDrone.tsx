@@ -36,6 +36,12 @@ type Position = {
   arrivedAtCustomer?: boolean;
   battery?: number;
   station?: string;
+  progress?: number;
+  segmentDistanceMeters?: number;
+  traveledMeters?: number;
+  halfwayReached?: boolean;
+  halfwayJustReached?: boolean;
+  segment?: Segment;
 };
 
 type SegmentState = {
@@ -43,11 +49,26 @@ type SegmentState = {
   pickupDone?: boolean;
   deliveryStart?: number;
   deliveryDone?: boolean;
+  deliveryHalfwayNotified?: boolean;
+  pickupHalfwayNotified?: boolean;
 };
 
 const STORAGE_PREFIX = "drone-sim-";
+const STORAGE_VERSION = "v2";
+const LEGACY_STORAGE_VERSION = "v1";
+const DEFAULT_SEGMENT_DURATION_MS = 30000;
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
+const toRadians = (deg: number) => (deg * Math.PI) / 180;
+const haversineMeters = (from: LatLng, to: LatLng): number => {
+  const R = 6371000; // mean Earth radius in meters
+  const dLat = toRadians(to.lat - from.lat);
+  const dLng = toRadians(to.lng - from.lng);
+  const lat1 = toRadians(from.lat);
+  const lat2 = toRadians(to.lat);
+  const a = Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
 
 const readPersisted = (key: string): SegmentState => {
   if (typeof window === "undefined") return {};
@@ -78,17 +99,28 @@ export default function TrackDrone({
   restaurantLocation,
   customerLocation,
   segment = "delivery",
-  durationMs = 10000,
+  durationMs = DEFAULT_SEGMENT_DURATION_MS,
   persistKey,
   displayDroneId,
 }: Props) {
   const [mapReady, setMapReady] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
-  const [state, setState] = useState<SegmentState>(() =>
-    readPersisted((persistKey || STORAGE_PREFIX + orderId) + "-v1")
-  );
+  const [halfwayBannerMessage, setHalfwayBannerMessage] = useState<string | null>(null);
+  const baseStorageKey = persistKey || STORAGE_PREFIX + orderId;
+  const storageKey = `${baseStorageKey}-${STORAGE_VERSION}`;
+  const legacyStorageKey = `${baseStorageKey}-${LEGACY_STORAGE_VERSION}`;
+  const readStateWithLegacy = () => {
+    const current = readPersisted(storageKey);
+    if (Object.keys(current).length) return current;
+    const legacy = readPersisted(legacyStorageKey);
+    if (Object.keys(legacy).length) {
+      writePersisted(storageKey, legacy);
+      return legacy;
+    }
+    return {} as SegmentState;
+  };
+  const [state, setState] = useState<SegmentState>(() => readStateWithLegacy());
   const stateRef = useRef<SegmentState>(state);
-  const storageKey = (persistKey || STORAGE_PREFIX + orderId) + "-v1";
   // No backend errors surfaced in simulation mode; toast removed
 
   // Fixed coordinates (can be parameterized later)
@@ -152,9 +184,32 @@ export default function TrackDrone({
 
   useEffect(() => {
     const fresh = readPersisted(storageKey);
-    stateRef.current = fresh;
-    setState(fresh);
-  }, [storageKey]);
+    if (Object.keys(fresh).length) {
+      stateRef.current = fresh;
+      setState(fresh);
+      return;
+    }
+    const legacy = readPersisted(legacyStorageKey);
+    if (Object.keys(legacy).length) {
+      writePersisted(storageKey, legacy);
+      stateRef.current = legacy;
+      setState(legacy);
+      return;
+    }
+    stateRef.current = {};
+    setState({});
+  }, [storageKey, legacyStorageKey]);
+
+  useEffect(() => {
+    if (!position?.halfwayJustReached) return;
+    const text =
+      segment === "pickup"
+        ? "Drone đang tới nhà hàng và đã bay được 1/2 quãng đường."
+        : "Drone đã bay được 1/2 quãng đường tới khách hàng.";
+    setHalfwayBannerMessage(text);
+    const timeout = setTimeout(() => setHalfwayBannerMessage(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [position?.halfwayJustReached, segment]);
 
   const lerpPoint = (from: LatLng, to: LatLng, t: number): LatLng => ({
     lat: from.lat + (to.lat - from.lat) * t,
@@ -191,6 +246,10 @@ export default function TrackDrone({
       const startPoint = segment === "pickup" ? station : restaurant;
       const endPoint = segment === "pickup" ? restaurant : customer;
       const point = lerpPoint(startPoint, endPoint, progress);
+      const segmentDistance = haversineMeters(startPoint, endPoint);
+      const traveledMeters = segmentDistance * progress;
+      let halfwayJustReached = false;
+      let halfwayReached = progress >= 0.5;
 
       const status =
         segment === "pickup"
@@ -202,6 +261,18 @@ export default function TrackDrone({
             : "delivering";
 
       const arrivedAtCustomer = segment === "delivery" && progress >= 1;
+
+      if (segment === "delivery" && !currentState.deliveryHalfwayNotified && progress >= 0.5) {
+        halfwayJustReached = true;
+        currentState = { ...currentState, deliveryHalfwayNotified: true };
+        updateState(currentState);
+      }
+
+      if (segment === "pickup" && !currentState.pickupHalfwayNotified && progress >= 0.5) {
+        halfwayJustReached = true;
+        currentState = { ...currentState, pickupHalfwayNotified: true };
+        updateState(currentState);
+      }
 
       if (segment === "pickup" && progress >= 1 && !currentState.pickupDone) {
         currentState = { ...currentState, pickupDone: true };
@@ -221,6 +292,12 @@ export default function TrackDrone({
         battery: Math.max(5, 100 - progress * 10),
         station: station.name,
         arrivedAtCustomer,
+        progress,
+        segmentDistanceMeters: segmentDistance,
+        traveledMeters,
+        halfwayReached,
+        halfwayJustReached,
+        segment,
       };
 
       if (onPositionChange) onPositionChange(nextPosition);
@@ -248,7 +325,7 @@ export default function TrackDrone({
 
   return (
     <div className="space-y-3">
-      <div className="w-full rounded-lg overflow-hidden border" style={{ height }}>
+      <div className="w-full rounded-lg overflow-hidden border relative" style={{ height }}>
         {mapReady && (
           <MapContainer
             center={position ? [position.lat, position.lng] : DEFAULT_CENTER}
@@ -273,6 +350,11 @@ export default function TrackDrone({
         )}
         {!mapReady && (
           <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Đang tải bản đồ...</div>
+        )}
+        {halfwayBannerMessage && (
+          <div className="absolute top-3 right-3 bg-white/90 px-3 py-2 rounded-md shadow text-sm font-medium text-amber-600">
+            {halfwayBannerMessage}
+          </div>
         )}
       </div>
       <div className="flex items-center justify-between text-sm text-muted-foreground">

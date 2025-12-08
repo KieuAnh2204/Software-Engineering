@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "wouter";
 import axios from "axios";
 import { Header } from "@/components/Header";
@@ -35,6 +35,8 @@ export default function TrackDeliveryPage() {
   const [droneStatus, setDroneStatus] = useState<string>("assigning");
   const [droneId, setDroneId] = useState<string | undefined>();
   const [droneArrived, setDroneArrived] = useState(false);
+  const [halfwayReached, setHalfwayReached] = useState(false);
+  const halfwayToastShownRef = useRef(false);
   const { toast } = useToast();
 
   const getAuthHeader = () => {
@@ -63,6 +65,12 @@ export default function TrackDeliveryPage() {
   useEffect(() => {
     fetchOrder();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId]);
+
+  useEffect(() => {
+    halfwayToastShownRef.current = false;
+    setHalfwayReached(false);
+    setDroneArrived(false);
   }, [orderId]);
 
   const arrived = droneArrived || order?.status === "completed";
@@ -101,6 +109,14 @@ export default function TrackDeliveryPage() {
                   setDroneStatus(pos.status);
                   setDroneId(pos.droneId);
                   if (pos.arrivedAtCustomer) setDroneArrived(true);
+                  if (pos.halfwayReached) setHalfwayReached(true);
+                  if (pos.halfwayJustReached && !halfwayToastShownRef.current) {
+                    halfwayToastShownRef.current = true;
+                    toast({
+                      title: "Drone đã bay được nửa quãng đường",
+                      description: "Chuẩn bị nhận đơn hàng trong ít phút nữa.",
+                    });
+                  }
                 }}
                 restaurantLocation={(() => {
                   const rid = order?.restaurant_id;
@@ -162,6 +178,9 @@ export default function TrackDeliveryPage() {
                 <p>Drone updates every second from the drone-service.</p>
                 <p>Drone sẽ yêu cầu bạn nhập 4 số cuối của số điện thoại khi tới nơi.</p>
                 {order?.pin_code && <p>PIN: {order.pin_code}</p>}
+                {halfwayReached && !arrived && (
+                  <p className="text-amber-600 font-medium">Drone chỉ còn 1/2 quãng đường đến bạn.</p>
+                )}
               </div>
 
               <div className="flex gap-3">

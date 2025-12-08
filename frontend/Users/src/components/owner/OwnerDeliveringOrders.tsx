@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,10 @@ import { getFixedRestaurantLocation } from "@/lib/restaurantLocations";
 
 const RESTAURANT_FALLBACK = { lng: 106.7009, lat: 10.7769 };
 const CUSTOMER_FALLBACK = { lng: 106.6297, lat: 10.8231 };
+const STORAGE_VERSION = "v2";
+const LEGACY_STORAGE_VERSION = "v1";
+const buildStorageKey = (orderId: string, version: string = STORAGE_VERSION) =>
+  `drone-sim-${orderId}-${version}`;
 
 type OrderItem = {
   name?: string;
@@ -49,6 +53,22 @@ export default function OwnerDeliveringOrders() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
+  const halfwayToastShownRef = useRef<Record<string, boolean>>({});
+  const showHalfwayToast = (orderKey: string, segment: "pickup" | "delivery") => {
+    const toastKey = `${orderKey}-${segment}`;
+    if (halfwayToastShownRef.current[toastKey]) return;
+    halfwayToastShownRef.current[toastKey] = true;
+    toast({
+      title:
+        segment === "pickup"
+          ? "Drone đã đi 1/2 quãng đường tới nhà hàng"
+          : "Drone đã đi 1/2 quãng đường tới khách hàng",
+      description:
+        segment === "pickup"
+          ? "Đảm bảo món ăn sẵn sàng cho drone nhận."
+          : "Chuẩn bị giao món cho khách trong giây lát.",
+    });
+  };
 
   const token = localStorage.getItem("token") || "";
   const orderBaseUrl =
@@ -90,8 +110,9 @@ export default function OwnerDeliveringOrders() {
         items.forEach((o) => {
           const id = o._id || o.id;
           if (!id) return;
-          const key = `drone-sim-${id}-v1`;
-          const raw = localStorage.getItem(key);
+          const key = buildStorageKey(id);
+          const legacyKey = buildStorageKey(id, LEGACY_STORAGE_VERSION);
+          const raw = localStorage.getItem(key) || localStorage.getItem(legacyKey);
           const parsed = raw ? JSON.parse(raw) : {};
           const next = {
             ...parsed,
@@ -99,6 +120,9 @@ export default function OwnerDeliveringOrders() {
             deliveryStart: parsed?.deliveryStart || Date.now(),
           };
           localStorage.setItem(key, JSON.stringify(next));
+          if (legacyKey !== key) {
+            localStorage.removeItem(legacyKey);
+          }
           if (o.customer_location) {
             localStorage.setItem(
               `order-customer-location-${id}`,
@@ -278,11 +302,15 @@ export default function OwnerDeliveringOrders() {
               orderId={trackingOrderId}
               height={420}
               segment="delivery"
-              durationMs={10000}
               persistKey={trackingOrderId}
               displayDroneId={
                 orders.find((o) => (o._id || o.id) === trackingOrderId)?.assigned_drone_id
               }
+              onPositionChange={(pos) => {
+                if (!trackingOrderId || !pos.halfwayJustReached) return;
+                const seg = pos.segment === "pickup" ? "pickup" : "delivery";
+                showHalfwayToast(trackingOrderId, seg);
+              }}
               restaurantLocation={getFixedRestaurantLocation(restaurantId)}
               customerLocation={
                 orders.find((o) => (o._id || o.id) === trackingOrderId)?.customer_location ||
