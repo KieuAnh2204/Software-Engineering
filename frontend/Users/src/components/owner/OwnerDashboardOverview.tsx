@@ -1,54 +1,212 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useCallback, useEffect, useState } from "react";
+import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Package, ShoppingBag, TrendingUp, CheckCircle2 } from "lucide-react";
+import { DollarSign, Package, ShoppingBag, TrendingUp } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { RestaurantStatus, Order } from "@shared/schema";
-import { format } from "date-fns";
+import { isSameDay } from "date-fns";
+import { useRestaurantOwnerAuth } from "@/contexts/RestaurantOwnerAuthContext";
+import { formatVND } from "@/lib/currency";
 
-export default function OwnerDashboardOverview() {
+const TOTAL_ORDER_STATUSES = ["confirmed", "preparing", "ready_for_pickup", "completed"] as const;
+const PENDING_STATUSES = ["pending", "payment_pending", "submitted"] as const;
+const STATUS_QUERY = Array.from(
+  new Set([...TOTAL_ORDER_STATUSES, ...PENDING_STATUSES, "delivering"])
+).join(",");
+
+const normalizeStatus = (status?: string) =>
+  String(status || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+
+type Stats = {
+  totalRevenue: number;
+  totalOrders: number;
+  todaysOrders: number;
+  pendingOrders: number;
+};
+
+type OrderItem = {
+  name?: string;
+  quantity?: number;
+  price?: number;
+};
+
+type Order = {
+  _id?: string;
+  id?: string;
+  status?: string;
+  items?: OrderItem[];
+  customer_name?: string;
+  customerName?: string;
+  long_address?: string;
+  customer_address?: string;
+  customerAddress?: string;
+  total_amount?: number;
+  totalAmount?: number;
+  orderedAt?: string;
+  created_at?: string;
+  quantity?: number;
+};
+
+const getOrderTotal = (order: Order) => {
+  const rawTotal = order.total_amount ?? order.totalAmount;
+  if (typeof rawTotal === "string") return parseFloat(rawTotal) || 0;
+  if (typeof rawTotal === "number") return rawTotal;
+
+  if (order.items?.length) {
+    return order.items.reduce(
+      (sum, item) => sum + (item.quantity || 0) * (item.price || 0),
+      0
+    );
+  }
+  return 0;
+};
+
+const parseOrderDate = (order: Order) => {
+  const dateValue = order.created_at || order.orderedAt;
+  if (!dateValue) return null;
+  const parsed = new Date(dateValue);
+  return isNaN(parsed.getTime()) ? null : parsed;
+};
+
+export default function OwnerDashboardOverview({
+  onNavigate,
+}: {
+  onNavigate?: (view: string) => void;
+}) {
+  const { restaurantId: ctxRestaurantId } = useRestaurantOwnerAuth();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(true);
-
-  const { data: restaurantStatus } = useQuery<RestaurantStatus>({
-    queryKey: ["/api/owner/restaurant/status"],
+  const [stats, setStats] = useState<Stats>({
+    totalRevenue: 0,
+    totalOrders: 0,
+    todaysOrders: 0,
+    pendingOrders: 0,
   });
+  const [loadingStats, setLoadingStats] = useState(false);
 
-  const { data: orders = [] } = useQuery<Order[]>({
-    queryKey: ["/api/owner/orders"],
-  });
+  const token =
+    localStorage.getItem("owner_token") ||
+    localStorage.getItem("token") ||
+    "";
+  const orderBaseUrl =
+    import.meta.env.VITE_ORDER_BASE_URL ||
+    import.meta.env.VITE_ORDER_API ||
+    "http://localhost:3002/api/orders";
+  const restaurantId =
+    ctxRestaurantId ||
+    localStorage.getItem("restaurant_id") ||
+    localStorage.getItem("owner_restaurant_id") ||
+    localStorage.getItem("restaurantId") ||
+    "";
 
-  const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      apiRequest("PATCH", `/api/owner/orders/${id}/status`, { status }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/owner/orders"] });
-      toast({ title: "Order status updated to ready for delivery" });
-    },
-    onError: () => {
-      toast({
-        title: "Failed to update order status",
-        variant: "destructive",
+  const computeStatsFromOrders = useCallback(
+    (orders: Order[]) => {
+      const normalized = orders.map((order) => ({
+        order,
+        normalizedStatus: normalizeStatus(order.status),
+        orderDate: parseOrderDate(order),
+      }));
+
+      const pending = normalized
+        .filter(({ normalizedStatus }) => PENDING_STATUSES.includes(normalizedStatus as any))
+        .map(({ order }) => order);
+
+      const totalOrders = normalized.filter(({ normalizedStatus }) =>
+        TOTAL_ORDER_STATUSES.includes(normalizedStatus as any)
+      ).length;
+
+      const todaysOrders = normalized.filter(
+        ({ orderDate }) => orderDate && isSameDay(orderDate, new Date())
+      ).length;
+
+      const totalRevenue = normalized.reduce(
+        (sum, { order }) => sum + getOrderTotal(order),
+        0
+      );
+
+      setStats({
+        totalRevenue,
+        totalOrders,
+        todaysOrders,
+        pendingOrders: pending.length,
       });
     },
-  });
+    []
+  );
+
+  const fetchOrdersAndStats = useCallback(async () => {
+    if (!orderBaseUrl || !restaurantId) {
+      setStats({
+        totalRevenue: 0,
+        totalOrders: 0,
+        todaysOrders: 0,
+        pendingOrders: 0,
+      });
+      return;
+    }
+    try {
+      setLoadingStats(true);
+      const res = await axios.get(`${orderBaseUrl}/restaurant`, {
+        params: {
+          restaurant_id: restaurantId,
+          status: STATUS_QUERY,
+          limit: 200,
+        },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const orders = res.data?.data || res.data?.items || res.data?.orders || [];
+      computeStatsFromOrders(Array.isArray(orders) ? orders : []);
+    } catch (error) {
+      console.error("Error loading orders:", error);
+      toast({
+        title: "Unable to load stats",
+        description: "Could not load order metrics. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingStats(false);
+    }
+  }, [STATUS_QUERY, computeStatsFromOrders, orderBaseUrl, restaurantId, token, toast]);
+
+  const fetchRestaurantStatus = useCallback(async () => {
+    try {
+      const res = await axios.get("/api/owner/restaurant/status", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const nextStatus = res.data?.isOpen ?? res.data?.data?.isOpen;
+      if (typeof nextStatus === "boolean") {
+        setIsOpen(nextStatus);
+      }
+    } catch (error) {
+      console.error("Error loading restaurant status:", error);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchOrdersAndStats();
+    fetchRestaurantStatus();
+  }, [fetchOrdersAndStats, fetchRestaurantStatus]);
 
   const handleStatusToggle = async (checked: boolean) => {
     try {
       setIsOpen(checked);
-      const response = await fetch("/api/owner/restaurant/status", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isOpen: checked }),
-      });
-      
-      if (!response.ok) throw new Error("Failed to update status");
-      
+      await axios.patch(
+        "/api/owner/restaurant/status",
+        { isOpen: checked },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
       toast({
         title: "Status updated",
         description: `Restaurant is now ${checked ? "open" : "closed"}`,
@@ -63,24 +221,6 @@ export default function OwnerDashboardOverview() {
     }
   };
 
-  const totalRevenue = orders.reduce((sum: number, order: Order) => 
-    sum + parseFloat(order.totalAmount || "0"), 0
-  );
-
-  const todayOrders = orders.filter((order: Order) => {
-    const orderDate = new Date(order.orderedAt);
-    const today = new Date();
-    return orderDate.toDateString() === today.toDateString();
-  });
-
-  const pendingOrders = orders.filter((order: Order) => 
-    order.status === "preparing"
-  );
-
-  const handleMarkReady = (orderId: string) => {
-    updateStatusMutation.mutate({ id: orderId, status: "delivering" });
-  };
-
   return (
     <div className="space-y-6">
       <Card>
@@ -91,12 +231,12 @@ export default function OwnerDashboardOverview() {
           <div className="flex items-center space-x-2">
             <Switch
               id="restaurant-status"
-              checked={restaurantStatus?.isOpen ?? isOpen}
+              checked={isOpen}
               onCheckedChange={handleStatusToggle}
               data-testid="switch-restaurant-status"
             />
             <Label htmlFor="restaurant-status">
-              {restaurantStatus?.isOpen ?? isOpen ? "Open for Orders" : "Closed"}
+              {isOpen ? "Open for Orders" : "Closed"}
             </Label>
           </div>
         </CardContent>
@@ -110,7 +250,7 @@ export default function OwnerDashboardOverview() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-revenue">
-              ${totalRevenue.toFixed(2)}
+              {loadingStats ? "..." : formatVND(stats.totalRevenue)}
             </div>
             <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
@@ -123,7 +263,7 @@ export default function OwnerDashboardOverview() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-orders">
-              {orders.length}
+              {loadingStats ? "..." : stats.totalOrders}
             </div>
             <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
@@ -136,9 +276,9 @@ export default function OwnerDashboardOverview() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-today-orders">
-              {todayOrders.length}
+              {loadingStats ? "..." : stats.todaysOrders}
             </div>
-            <p className="text-xs text-muted-foreground">In the last 24 hours</p>
+            <p className="text-xs text-muted-foreground">Placed today</p>
           </CardContent>
         </Card>
 
@@ -149,63 +289,24 @@ export default function OwnerDashboardOverview() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-pending-orders">
-              {pendingOrders.length}
+              {loadingStats
+                ? "..."
+                : stats.pendingOrders}
             </div>
             <p className="text-xs text-muted-foreground">Needs attention</p>
+            <div className="mt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onNavigate?.("pending-orders")}
+                data-testid="button-view-pending"
+              >
+                View Pending Orders
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
-
-      {pendingOrders.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Pending Orders
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {pendingOrders.map((order) => (
-                <div 
-                  key={order.id} 
-                  className="flex items-center justify-between p-4 border rounded-md hover-elevate"
-                  data-testid={`pending-order-${order.id}`}
-                >
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{order.dishName}</p>
-                      <Badge variant="default" data-testid={`badge-status-${order.id}`}>
-                        Preparing
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>Customer: {order.customerName || "N/A"}</span>
-                      <span>Qty: {order.quantity}</span>
-                      <span>Total: ${order.totalAmount}</span>
-                      <span>{format(new Date(order.orderedAt), "MMM d, h:mm a")}</span>
-                    </div>
-                    {order.customerAddress && (
-                      <p className="text-sm text-muted-foreground">
-                        Address: {order.customerAddress}
-                      </p>
-                    )}
-                  </div>
-                  <Button
-                    onClick={() => handleMarkReady(order.id)}
-                    disabled={updateStatusMutation.isPending}
-                    data-testid={`button-ready-${order.id}`}
-                    className="ml-4"
-                  >
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Ready
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

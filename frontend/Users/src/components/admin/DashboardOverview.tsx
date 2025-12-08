@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Users, Store, ShoppingBag, DollarSign } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { RevenueSummary } from "@shared/schema";
+import { formatVND } from "@/lib/currency";
 import {
   LineChart,
   Line,
@@ -44,7 +45,7 @@ export default function DashboardOverview() {
   const stats = [
     {
       title: "Total Revenue",
-      value: `$${revenueSummary?.totalRevenue || "0.00"}`,
+      value: formatVND(revenueSummary?.totalRevenue || 0),
       icon: DollarSign,
       testId: "stat-revenue",
     },
@@ -56,7 +57,7 @@ export default function DashboardOverview() {
     },
     {
       title: "Average Order",
-      value: `$${revenueSummary?.averageOrderValue || "0.00"}`,
+      value: formatVND(revenueSummary?.averageOrderValue || 0),
       icon: TrendingUp,
       testId: "stat-average-order",
     },
@@ -114,7 +115,7 @@ export default function DashboardOverview() {
                 <YAxis 
                   className="text-xs"
                   tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                  tickFormatter={(value) => `$${value}`}
+                  tickFormatter={(value) => formatVND(value)}
                 />
                 <Tooltip 
                   content={({ active, payload }) => {
@@ -135,7 +136,7 @@ export default function DashboardOverview() {
                                 Revenue
                               </span>
                               <span className="font-bold">
-                                ${payload[0].value}
+                                {formatVND(payload[0].value as number)}
                               </span>
                             </div>
                             <div className="flex flex-col">
@@ -191,7 +192,7 @@ export default function DashboardOverview() {
                       <p className="text-sm text-muted-foreground">{dish.orderCount} orders</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium">${dish.totalRevenue}</p>
+                      <p className="font-medium">{formatVND(dish.totalRevenue)}</p>
                     </div>
                   </div>
                 ))}

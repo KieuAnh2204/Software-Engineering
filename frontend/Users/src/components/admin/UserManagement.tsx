@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Search, MoreVertical, Ban, CheckCircle } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,16 +19,67 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+
+type Customer = {
+  _id: string;
+  full_name?: string;
+  phone?: string;
+  address?: string;
+  createdAt?: string;
+  user?: {
+    _id: string;
+    email?: string;
+    username?: string;
+    isActive?: boolean;
+    createdAt?: string;
+  };
+};
 
 export default function UserManagement() {
   const [searchQuery, setSearchQuery] = useState("");
+  const { toast } = useToast();
 
-  const users = [
-    { id: "1", name: "John Doe", email: "john@example.com", phone: "+1 234 567 8900", orders: 23, totalSpent: 567.89, status: "active", joinDate: "2024-12-15" },
-    { id: "2", name: "Jane Smith", email: "jane@example.com", phone: "+1 234 567 8901", orders: 15, totalSpent: 423.12, status: "active", joinDate: "2025-01-02" },
-    { id: "3", name: "Bob Johnson", email: "bob@example.com", phone: "+1 234 567 8902", orders: 8, totalSpent: 234.56, status: "inactive", joinDate: "2025-01-10" },
-    { id: "4", name: "Alice Brown", email: "alice@example.com", phone: "+1 234 567 8903", orders: 31, totalSpent: 789.34, status: "active", joinDate: "2024-11-20" },
-  ];
+  const { data, isLoading } = useQuery<{
+    success?: boolean;
+    data?: Customer[];
+  }>({
+    queryKey: ["/api/admin/users/customers"],
+  });
+
+  const customers = useMemo(() => data?.data || [], [data]);
+
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      apiRequest("PATCH", `/api/admin/users/${id}/active`, { isActive }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users/customers"] });
+      toast({
+        title: "Success",
+        description: "User status updated",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update user status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const filtered = customers.filter((c) => {
+    const name = c.full_name || c.user?.username || "";
+    const email = c.user?.email || "";
+    const phone = c.phone || "";
+    const q = searchQuery.toLowerCase();
+    return (
+      name.toLowerCase().includes(q) ||
+      email.toLowerCase().includes(q) ||
+      phone.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-4">
@@ -51,48 +103,76 @@ export default function UserManagement() {
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
-              <TableHead>Orders</TableHead>
-              <TableHead>Total Spent</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Join Date</TableHead>
+              <TableHead>Address</TableHead>
+              <TableHead>Joined</TableHead>
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell className="font-medium">{user.name}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.phone}</TableCell>
-                <TableCell>{user.orders}</TableCell>
-                <TableCell>${user.totalSpent.toFixed(2)}</TableCell>
-                <TableCell>
-                  <Badge variant={user.status === "active" ? "default" : "secondary"}>
-                    {user.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>{new Date(user.joinDate).toLocaleDateString()}</TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" data-testid={`button-user-menu-${user.id}`}>
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        View Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Ban className="h-4 w-4 mr-2" />
-                        {user.status === "active" ? "Deactivate" : "Activate"}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center">
+                  Loading...
                 </TableCell>
               </TableRow>
-            ))}
+            ) : filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center">
+                  No customers found
+                </TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((customer) => {
+                const joinDate = customer.createdAt || customer.user?.createdAt;
+                const displayName = customer.full_name || customer.user?.username || "N/A";
+                const email = customer.user?.email || "N/A";
+                const isActive = customer.user?.isActive !== false;
+                const userId = customer.user?._id || customer._id;
+                return (
+                  <TableRow key={userId}>
+                    <TableCell className="font-medium">{displayName}</TableCell>
+                    <TableCell>{email}</TableCell>
+                    <TableCell>{customer.phone || "N/A"}</TableCell>
+                    <TableCell>
+                      <Badge variant={isActive ? "default" : "secondary"}>
+                        {isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{customer.address || "N/A"}</TableCell>
+                    <TableCell>
+                      {joinDate ? new Date(joinDate).toLocaleDateString() : "N/A"}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            data-testid={`button-user-menu-${customer._id}`}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() =>
+                              updateStatusMutation.mutate({
+                                id: userId,
+                                isActive: !isActive,
+                              })
+                            }
+                          >
+                            <Ban className="h-4 w-4 mr-2" />
+                            {isActive ? "Deactivate" : "Activate"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+            );
+          })
+        )}
           </TableBody>
         </Table>
       </Card>

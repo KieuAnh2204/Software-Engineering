@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
+import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,7 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getDishes, createDish, updateDish, deleteDish } from "@/api/ownerApi";
+import { formatVND } from "@/lib/currency";
 import {
   Select,
   SelectContent,
@@ -30,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { jwtDecode } from "jwt-decode";
 
 interface DishData {
   _id?: string;
@@ -40,7 +42,7 @@ interface DishData {
   image_url: string;
   is_available: boolean;
   category?: string;
-  imageFile?: File; // For file upload
+  imageFile?: File;
 }
 
 export default function OwnerMenuManagement() {
@@ -49,8 +51,27 @@ export default function OwnerMenuManagement() {
   const [editingDish, setEditingDish] = useState<DishData | null>(null);
   const [dishes, setDishes] = useState<DishData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
+  const rawToken =
+    localStorage.getItem("owner_token") ||
+    localStorage.getItem("token") ||
+    "";
+  const extractOwnerIdFromToken = (token: string) => {
+    try {
+      const decoded: any = jwtDecode(token);
+      return decoded.owner_id || decoded.id || decoded.userId || decoded._id || "";
+    } catch {
+      return "";
+    }
+  };
+  const ownerId =
+    localStorage.getItem("owner_id") ||
+    extractOwnerIdFromToken(rawToken);
+  const [restaurantId, setRestaurantId] = useState("");
+  const productBaseUrl =
+    import.meta.env.VITE_PRODUCT_BASE_URL || import.meta.env.VITE_PRODUCT_API;
   const [formData, setFormData] = useState<DishData>({
-    restaurant_id: "691938ab48990eb197f96549", // ID nhà hàng từ MongoDB
+    restaurant_id: "",
     name: "",
     description: "",
     price: 0,
@@ -58,123 +79,213 @@ export default function OwnerMenuManagement() {
     is_available: true,
   });
 
-  // Load dishes khi component mount
-  useEffect(() => {
-    loadDishes();
-  }, []);
+  // Fetch or create restaurant for this owner
+  const ensureRestaurant = useCallback(async () => {
+    if (!rawToken) {
+      console.log("Missing token");
+      return;
+    }
 
-  const loadDishes = async () => {
+    try {
+      console.log("Fetching restaurant for current owner");
+      // Get restaurant by owner token - using new /owner/me endpoint
+      const res = await axios.get(
+        `${productBaseUrl}/restaurants/owner/me`,
+        {
+          headers: { Authorization: `Bearer ${rawToken}` },
+        }
+      );
+
+      console.log("Restaurant fetch response:", res.data);
+
+      if (res.data?.success && res.data.data) {
+        // Owner already has a restaurant
+        const existingRestaurant = res.data.data;
+        console.log("Found existing restaurant:", existingRestaurant);
+        setRestaurantId(existingRestaurant._id);
+        setFormData((prev) => ({ ...prev, restaurant_id: existingRestaurant._id }));
+        try {
+          localStorage.setItem("restaurant_id", existingRestaurant._id);
+          localStorage.setItem("owner_restaurant_id", existingRestaurant._id);
+          localStorage.setItem("restaurantId", existingRestaurant._id);
+        } catch {
+          // ignore storage errors
+        }
+        return;
+      }
+    } catch (error: any) {
+      // If 404, owner doesn't have restaurant yet - will create on first dish add
+      if (error.response?.status === 404) {
+        console.log("No restaurant found for this owner");
+        return;
+      }
+      
+      console.error("Ensure restaurant error:", error);
+      toast({
+        title: "Unable to load restaurant",
+        description: error.response?.data?.message || "Please try again",
+        variant: "destructive",
+      });
+    }
+  }, [productBaseUrl, rawToken, toast]);
+
+  const loadDishes = useCallback(async () => {
+    if (!productBaseUrl || !restaurantId) {
+      setDishes([]);
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await getDishes(formData.restaurant_id);
-      setDishes(response.data.data || []);
-    } catch (error: any) {
+      const res = await axios.get(
+        `${productBaseUrl}/dishes?restaurant_id=${restaurantId}`,
+        {
+          headers: { Authorization: `Bearer ${rawToken}` },
+        }
+      );
+
+      setDishes(res.data?.data || []);
+    } catch (error) {
       console.error("Load dishes error:", error);
       toast({
-        title: "Lỗi tải danh sách món ăn",
-        description: error.response?.data?.message || "Vui lòng thử lại",
+        title: "Unable to load dishes",
+        description: "Please check the connection and try again.",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [productBaseUrl, restaurantId, rawToken, toast]);
+
+  useEffect(() => {
+    ensureRestaurant().then(() => {
+      if (restaurantId) {
+        loadDishes();
+      }
+    });
+  }, [ensureRestaurant]);
+
+  useEffect(() => {
+    if (restaurantId) {
+      loadDishes();
+    }
+  }, [restaurantId, loadDishes]);
 
   const resetForm = () => {
     setFormData({
-      restaurant_id: "691938ab48990eb197f96549",
+      restaurant_id: restaurantId,
       name: "",
       description: "",
       price: 0,
       image_url: "",
       is_available: true,
+      imageFile: undefined,
     });
+    setPreviewUrl("");
     setEditingDish(null);
     setIsDialogOpen(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate form
-    if (!formData.name.trim()) {
-      toast({ title: "Vui lòng nhập tên món ăn", variant: "destructive" });
+
+    let targetRestaurantId = restaurantId || formData.restaurant_id;
+
+    if (!productBaseUrl) {
+      toast({ title: "Missing product service URL", variant: "destructive" });
       return;
     }
-    
+
+    // Auto-create restaurant if not exists
+    if (!targetRestaurantId) {
+      await ensureRestaurant();
+      targetRestaurantId = restaurantId;
+      
+      if (!targetRestaurantId) {
+        toast({ title: "Unable to create restaurant. Please try again.", variant: "destructive" });
+        return;
+      }
+    }
+
+    if (!formData.name.trim()) {
+      toast({ title: "Please enter a dish name", variant: "destructive" });
+      return;
+    }
+
     if (formData.price <= 0) {
-      toast({ title: "Giá món ăn phải lớn hơn 0", variant: "destructive" });
+      toast({ title: "Price must be greater than 0", variant: "destructive" });
       return;
     }
 
     try {
       setLoading(true);
-      
-      const dishData = {
-        restaurant_id: formData.restaurant_id,
-        name: formData.name,
-        description: formData.description,
-        price: formData.price,
-        image_url: formData.image_url || undefined,
-        is_available: formData.is_available,
-      };
-      
+      const dishForm = new FormData();
+      dishForm.append("restaurant_id", targetRestaurantId);
+      dishForm.append("name", formData.name);
+      dishForm.append("description", formData.description);
+      dishForm.append("price", String(formData.price));
+      dishForm.append("is_available", String(formData.is_available));
+      if (formData.imageFile) {
+        dishForm.append("image", formData.imageFile);
+      }
+      if (formData.image_url) {
+        dishForm.append("image_url", formData.image_url);
+      }
+
       if (editingDish) {
-        // Update existing dish
-        await updateDish(editingDish._id!, dishData);
-        
+        await axios.put(
+          `${productBaseUrl}/dishes/${editingDish._id}`,
+          dishForm,
+          {
+            headers: {
+              Authorization: `Bearer ${rawToken}`,
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+
         toast({
-          title: "Cập nhật thành công",
-          description: "Món ăn đã được cập nhật",
+          title: "Dish updated",
+          description: `"${formData.name}" has been updated`,
         });
       } else {
-        // Create new dish
-        const response = await createDish(dishData);
-        
-        if (response.data.success) {
-          toast({
-            title: "Tạo món ăn thành công",
-            description: `Đã thêm món "${formData.name}"`,
-          });
-        }
+        await axios.post(`${productBaseUrl}/dishes`, dishForm, {
+          headers: {
+            Authorization: `Bearer ${rawToken}`,
+            "Content-Type": "multipart/form-data",
+          },
+        });
+
+        alert("Added successfully");
       }
-      
+
       resetForm();
-      await loadDishes(); // Reload dishes
+      loadDishes();
     } catch (error: any) {
       console.error("Submit error:", error);
-      console.error("Error response:", error.response);
-      console.error("Error data:", error.response?.data);
-      
-      // Kiểm tra lỗi trùng lặp
+
       if (error.response?.status === 409 || error.response?.data?.duplicate) {
         toast({
-          title: "Món ăn đã tồn tại",
-          description: "Món ăn này đã có trong menu nhà hàng",
+          title: "Dish already exists",
+          description: "This dish is already in the menu",
           variant: "destructive",
         });
       } else if (error.response?.status === 401) {
         toast({
-          title: "Lỗi xác thực",
-          description: "Token hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại",
+          title: "Authentication error",
+          description: "Token is invalid or expired. Please login again.",
           variant: "destructive",
         });
       } else if (error.response?.status === 403) {
         toast({
-          title: "Không có quyền",
-          description: error.response?.data?.message || "Bạn không có quyền thêm món ăn cho nhà hàng này",
-          variant: "destructive",
-        });
-      } else if (error.response?.status === 404) {
-        toast({
-          title: "Không tìm thấy nhà hàng",
-          description: "Restaurant ID không tồn tại. Vui lòng kiểm tra lại",
+          title: "Permission denied",
+          description: error.response?.data?.message || "You cannot add dishes to this restaurant.",
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Lỗi",
-          description: error.response?.data?.message || error.message || "Vui lòng thử lại",
+          title: "Unable to save dish",
+          description: error.response?.data?.message || "Please try again.",
           variant: "destructive",
         });
       }
@@ -185,6 +296,7 @@ export default function OwnerMenuManagement() {
 
   const handleEdit = (dish: DishData) => {
     setEditingDish(dish);
+    setRestaurantId(dish.restaurant_id);
     setFormData({
       restaurant_id: dish.restaurant_id,
       name: dish.name,
@@ -192,22 +304,27 @@ export default function OwnerMenuManagement() {
       price: dish.price,
       image_url: dish.image_url || "",
       is_available: dish.is_available,
+      imageFile: undefined,
     });
+    setPreviewUrl(dish.image_url || "");
     setIsDialogOpen(true);
   };
 
   const handleDelete = async (dishId: string) => {
-    if (!confirm("Bạn có chắc muốn xóa món ăn này?")) return;
+    if (!productBaseUrl) return;
+    if (!confirm("Are you sure you want to delete this dish?")) return;
 
     try {
       setLoading(true);
-      await deleteDish(dishId);
-      toast({ title: "Đã xóa món ăn" });
+      await axios.delete(`${productBaseUrl}/dishes/${dishId}`, {
+        headers: { Authorization: `Bearer ${rawToken}` },
+      });
+      toast({ title: "Dish deleted" });
       await loadDishes();
     } catch (error: any) {
       toast({
-        title: "Lỗi xóa món ăn",
-        description: error.response?.data?.message || "Vui lòng thử lại",
+        title: "Failed to delete dish",
+        description: error.response?.data?.message || "Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -216,15 +333,23 @@ export default function OwnerMenuManagement() {
   };
 
   const handleToggleAvailability = async (dish: DishData) => {
+    if (!productBaseUrl) return;
+
     try {
       setLoading(true);
-      await updateDish(dish._id!, { is_available: !dish.is_available });
-      toast({ title: "Đã cập nhật trạng thái" });
+      await axios.patch(
+        `${productBaseUrl}/dishes/${dish._id}`,
+        { is_available: !dish.is_available },
+        {
+          headers: { Authorization: `Bearer ${rawToken}` },
+        }
+      );
+      toast({ title: "Status updated" });
       await loadDishes();
     } catch (error: any) {
       toast({
-        title: "Lỗi cập nhật trạng thái",
-        description: error.response?.data?.message || "Vui lòng thử lại",
+        title: "Failed to update status",
+        description: error.response?.data?.message || "Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -260,7 +385,7 @@ export default function OwnerMenuManagement() {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  placeholder="Tên món ăn (VD: Bún bò Huế)"
+                  placeholder="Dish name"
                   required
                   data-testid="input-dish-name"
                 />
@@ -274,7 +399,7 @@ export default function OwnerMenuManagement() {
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  placeholder="Mô tả món ăn"
+                  placeholder="Dish description"
                   rows={3}
                   data-testid="input-dish-description"
                 />
@@ -293,40 +418,34 @@ export default function OwnerMenuManagement() {
                   onChange={(e) =>
                     setFormData({ ...formData, price: Number(e.target.value) })
                   }
-                  placeholder="Giá (VD: 55000)"
+                  placeholder="Price (e.g. 55000)"
                   required
                   data-testid="input-dish-price"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="image_url">Image URL</Label>
+                <Label htmlFor="image">Image</Label>
                 <Input
-                  id="image_url"
-                  type="url"
-                  value={formData.image_url}
-                  onChange={(e) =>
-                    setFormData({ ...formData, image_url: e.target.value })
-                  }
-                  placeholder="https://i.imgur.com/example.jpg"
+                  id="image"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setFormData({ ...formData, imageFile: file });
+                      setPreviewUrl(URL.createObjectURL(file));
+                    }
+                  }}
                   data-testid="input-dish-image"
                 />
                 <p className="text-xs text-gray-500">
-                  💡 Tip: Upload ảnh lên{" "}
-                  <a
-                    href="https://imgur.com/upload"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 underline"
-                  >
-                    Imgur
-                  </a>
-                  {" "}và paste link vào đây
+                  Leave empty to keep the current image.
                 </p>
-                {formData.image_url && (
+                {(previewUrl || formData.image_url) && (
                   <div className="mt-2">
                     <img
-                      src={formData.image_url}
+                      src={previewUrl || formData.image_url}
                       alt="Preview"
                       className="w-full max-w-xs h-48 object-cover rounded border"
                       onError={(e) => {
@@ -376,6 +495,7 @@ export default function OwnerMenuManagement() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Image</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Price</TableHead>
@@ -386,36 +506,46 @@ export default function OwnerMenuManagement() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">
+                  <TableCell colSpan={6} className="text-center">
                     Loading...
                   </TableCell>
                 </TableRow>
               ) : dishes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">
+                  <TableCell colSpan={6} className="text-center">
                     No dishes found
                   </TableCell>
                 </TableRow>
               ) : (
                 dishes.map((dish) => (
                   <TableRow key={dish._id} data-testid={`row-dish-${dish._id}`}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        {dish.image_url && (
-                          <img
-                            src={dish.image_url}
-                            alt={dish.name}
-                            className="w-10 h-10 object-cover rounded"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                            }}
-                          />
-                        )}
-                        {dish.name}
+                    <TableCell>
+                      {dish.image_url ? (
+                        <img
+                          src={dish.image_url}
+                          alt={dish.name}
+                          loading="lazy"
+                          className="w-16 h-16 object-cover rounded-lg shadow-sm bg-gray-100"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.style.display = 'none';
+                            const fallback = target.nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div 
+                        className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400 text-xs"
+                        style={{ display: dish.image_url ? 'none' : 'flex' }}
+                      >
+                        No Image
                       </div>
                     </TableCell>
+                    <TableCell className="font-medium">
+                      {dish.name}
+                    </TableCell>
                     <TableCell>{dish.category || "N/A"}</TableCell>
-                    <TableCell>{dish.price.toLocaleString()} VND</TableCell>
+                    <TableCell>{formatVND(dish.price)}</TableCell>
                     <TableCell>
                       <Badge
                         variant={dish.is_available ? "default" : "secondary"}

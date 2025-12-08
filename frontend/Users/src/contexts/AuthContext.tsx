@@ -1,6 +1,7 @@
 import { createContext, useState, useEffect, type ReactNode } from "react";
 import { loginCustomer, registerCustomer, getCustomerMe, updateCustomerProfile } from "@/api/auth";
 import { clearToken, getToken, setToken } from "@/api/client";
+import type { AxiosError } from "axios";
 
 interface User {
   id: string;
@@ -57,19 +58,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const login = async (email: string, password: string) => {
-    const response = await loginCustomer({ email, password });
-    const payload = response.data;
-    
-    // Lưu token vào localStorage
-    if (payload?.token) {
-      setToken(payload.token);
-      localStorage.setItem("token", payload.token);
+    try {
+      const response = await loginCustomer({ email, password });
+      const payload = response.data;
+      
+      if (payload?.token) {
+        setToken(payload.token);
+        localStorage.setItem("token", payload.token);
+      }
+      
+      const mapped = mapBackendUser(payload);
+      setUser(mapped);
+      localStorage.setItem("user", JSON.stringify(mapped));
+    } catch (err) {
+      const axErr = err as AxiosError<any>;
+      const code = axErr?.response?.data?.code;
+      if (code === "ACCOUNT_DEACTIVATED") {
+        const error: any = new Error("Account is deactivated");
+        error.code = code;
+        throw error;
+      }
+      throw err;
     }
-    
-    // Map và lưu user
-    const mapped = mapBackendUser(payload);
-    setUser(mapped);
-    localStorage.setItem("user", JSON.stringify(mapped));
   };
 
   const register = async (username: string, fullName: string, email: string, password: string, phone?: string, address?: string) => {

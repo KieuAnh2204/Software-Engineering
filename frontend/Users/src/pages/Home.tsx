@@ -1,70 +1,31 @@
-import { useState } from "react";
+import axios from "axios";
+import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { RestaurantCard } from "@/components/RestaurantCard";
 import { Link } from "wouter";
-import italianRestaurant from "@assets/generated_images/Italian_restaurant_exterior_b7a0fbc1.png";
-import asianRestaurant from "@assets/generated_images/Asian_restaurant_interior_4c64ebbb.png";
+
+type Restaurant = {
+  _id: string;
+  name: string;
+  logo_url?: string;
+};
 
 export default function Home() {
-  const [, setLocation] = useState<string>("");
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
 
-  const restaurants = [
-    {
-      id: "1",
-      name: "Bella Italia",
-      image: italianRestaurant,
-      cuisine: ["Italian", "Pizza", "Pasta"],
-      rating: 4.8,
-      deliveryTime: "25-35 min",
-      deliveryFee: 2.99,
-    },
-    {
-      id: "2",
-      name: "Tokyo Fusion",
-      image: asianRestaurant,
-      cuisine: ["Japanese", "Sushi", "Asian"],
-      rating: 4.6,
-      deliveryTime: "30-40 min",
-      deliveryFee: 0,
-    },
-    {
-      id: "3",
-      name: "Burger House",
-      image: italianRestaurant,
-      cuisine: ["American", "Burgers", "Fast Food"],
-      rating: 4.5,
-      deliveryTime: "20-30 min",
-      deliveryFee: 1.99,
-    },
-    {
-      id: "4",
-      name: "Spice Garden",
-      image: asianRestaurant,
-      cuisine: ["Indian", "Curry", "Vegetarian"],
-      rating: 4.7,
-      deliveryTime: "35-45 min",
-      deliveryFee: 2.49,
-    },
-    {
-      id: "5",
-      name: "Pizza Palace",
-      image: italianRestaurant,
-      cuisine: ["Italian", "Pizza"],
-      rating: 4.4,
-      deliveryTime: "25-35 min",
-      deliveryFee: 0,
-    },
-    {
-      id: "6",
-      name: "Sushi Express",
-      image: asianRestaurant,
-      cuisine: ["Japanese", "Sushi"],
-      rating: 4.9,
-      deliveryTime: "30-40 min",
-      deliveryFee: 3.99,
-    },
-  ];
+  useEffect(() => {
+    axios
+      .get<{ success: boolean; data: Restaurant[] }>(
+        "http://localhost:3003/api/restaurants",
+      )
+      .then((res) => {
+        if (res.data?.success && Array.isArray(res.data.data)) {
+          setRestaurants(res.data.data);
+        }
+      })
+      .catch((err) => console.error("Failed to load restaurants", err));
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -79,10 +40,13 @@ export default function Home() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {restaurants.map((restaurant) => (
-            <Link key={restaurant.id} href={`/restaurant/${restaurant.id}`}>
+            <Link key={restaurant._id} href={`/restaurant/${restaurant._id}`}>
               <RestaurantCard
-                {...restaurant}
-                onClick={() => setLocation(`/restaurant/${restaurant.id}`)}
+                id={restaurant._id}
+                name={restaurant.name}
+                image={restaurant.logo_url}
+                rating={4.5}
+                deliveryTime="20-30 min"
               />
             </Link>
           ))}

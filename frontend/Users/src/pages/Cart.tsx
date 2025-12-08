@@ -5,23 +5,38 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Link } from "wouter";
-import { useCart } from "@/contexts/CartContext";
+import { useCart, getLastCartRestaurantId } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
+import { formatVND } from "@/lib/currency";
 
 export default function Cart() {
-  const { cart, updateCartItem, removeFromCart, isLoading } = useCart();
+  const { cart, getCart, updateCartItem, removeFromCart, isLoading } = useCart();
   const { toast } = useToast();
 
-  // TODO: Get restaurant ID from the cart or context
-  const restaurantId = cart?.restaurant_id || "restaurant_id_placeholder";
+  // Prefer restaurant_id from cart; fall back to last stored
+  const restaurantId = cart?.restaurant_id || getLastCartRestaurantId();
+
+  useEffect(() => {
+    if (!cart && restaurantId) {
+      getCart(restaurantId).catch((error: any) => {
+        console.error("Failed to load cart", error);
+        toast({
+          title: "Error",
+          description: error?.response?.data?.message || "Failed to load cart",
+          variant: "destructive",
+        });
+      });
+    }
+  }, [cart, restaurantId, getCart, toast]);
   
   const cartItems = cart?.items || [];
   const subtotal = cart?.total_amount || 0;
-  const deliveryFee = 2.99;
-  const serviceFee = 1.50;
+  const deliveryFee = 25000;
+  const serviceFee = 12000;
   const total = subtotal + deliveryFee + serviceFee;
 
   const handleUpdateQuantity = async (itemId: string, currentQuantity: number, change: number) => {
+    if (!restaurantId) return;
     const newQuantity = currentQuantity + change;
     if (newQuantity < 1) return;
 
@@ -37,6 +52,7 @@ export default function Cart() {
   };
 
   const handleRemoveItem = async (itemId: string) => {
+    if (!restaurantId) return;
     try {
       await removeFromCart(restaurantId, itemId);
       toast({
@@ -112,7 +128,7 @@ export default function Cart() {
                       )}
                       <div className="flex items-center justify-between">
                         <span className="text-lg font-bold">
-                          ${item.price.toFixed(2)}
+                          {formatVND(item.price)}
                         </span>
                         <div className="flex items-center gap-3">
                           <div className="flex items-center gap-2">
@@ -167,21 +183,21 @@ export default function Cart() {
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span className="font-medium">${subtotal.toFixed(2)}</span>
+                    <span className="font-medium">{formatVND(subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Delivery fee</span>
-                    <span className="font-medium">${deliveryFee.toFixed(2)}</span>
+                    <span className="font-medium">{formatVND(deliveryFee)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Service fee</span>
-                    <span className="font-medium">${serviceFee.toFixed(2)}</span>
+                    <span className="font-medium">{formatVND(serviceFee)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-lg">
                     <span className="font-bold">Total</span>
                     <span className="font-bold text-primary">
-                      ${total.toFixed(2)}
+                      {formatVND(total)}
                     </span>
                   </div>
                 </div>

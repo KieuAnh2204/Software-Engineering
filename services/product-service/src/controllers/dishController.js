@@ -1,6 +1,25 @@
 const Dish = require('../models/Dish');
 const Restaurant = require('../models/Restaurant');
 
+exports.uploadImage = (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    // Cloudinary automatically provides the URL in req.file.path
+    const imageUrl = req.file.path;
+    return res.status(201).json({ 
+      success: true, 
+      image_url: imageUrl,
+      public_id: req.file.filename // Cloudinary public_id for deletion if needed
+    });
+  } catch (error) {
+    console.error('Upload image error:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
 exports.createDish = async (req, res) => {
   try {
     const { restaurant_id, name, description, price, image_url, is_available } = req.body;
@@ -11,10 +30,10 @@ exports.createDish = async (req, res) => {
     const restaurant = await Restaurant.findById(restaurant_id);
     if (!restaurant) return res.status(404).json({ success: false, message: 'Restaurant not found' });
     
-    // Temporarily disable owner check for testing
-    // if (req.user && req.user.role === 'owner' && restaurant.owner_id !== req.user.id) {
-    //   return res.status(403).json({ success: false, message: 'Cannot manage dishes for another owner' });
-    // }
+    // Check owner permission
+    if (req.user && req.user.role === 'owner' && restaurant.owner_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Cannot manage dishes for another owner restaurant' });
+    }
 
     // Kiểm tra món trùng lặp (cùng restaurant_id và name)
     const existingDish = await Dish.findOne({ 
@@ -30,12 +49,19 @@ exports.createDish = async (req, res) => {
       });
     }
 
+    // Prefer uploaded file over provided image_url
+    let finalImageUrl = image_url || null;
+    if (req.file) {
+      // Cloudinary provides the secure URL in req.file.path
+      finalImageUrl = req.file.path;
+    }
+
     const dish = await Dish.create({
       restaurant_id,
       name: name.trim(),
       description: description || '',
       price,
-      image_url: image_url || null,
+      image_url: finalImageUrl,
       is_available: is_available !== undefined ? is_available : true
     });
 
@@ -89,6 +115,12 @@ exports.updateDish = async (req, res) => {
         dish[field] = req.body[field];
       }
     });
+
+    // If new file uploaded, override image_url
+    if (req.file) {
+      // Cloudinary provides the secure URL in req.file.path
+      dish.image_url = req.file.path;
+    }
 
     await dish.save();
     res.status(200).json({ success: true, message: 'Dish updated', data: dish });

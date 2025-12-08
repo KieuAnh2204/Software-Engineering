@@ -12,13 +12,13 @@ export default function AdminLogin() {
   const [, setLocation] = useLocation();
   const { adminLogin } = useAdminAuth();
   const { toast } = useToast();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await adminLogin(username, password);
+      await adminLogin(email, password);
       toast({
         title: "Login successful",
         description: "Welcome to admin portal",
@@ -46,13 +46,15 @@ export default function AdminLogin() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
-                data-testid="input-admin-username"
+                data-testid="input-admin-email"
+                placeholder="admin@foodfast.com"
               />
             </div>
             <div className="space-y-2">

@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import axios from "axios";
 
 const ORDER_API = import.meta.env?.VITE_ORDER_API ?? "http://localhost:3002/api/orders";
+const LAST_CART_RESTAURANT_KEY = "last_cart_restaurant_id";
 
 interface CartItem {
   _id: string;
@@ -74,6 +75,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const client = createOrderClient();
       const response = await client.get(`/cart?restaurant_id=${restaurantId}`);
       setCart(response.data);
+      try {
+        localStorage.setItem(LAST_CART_RESTAURANT_KEY, restaurantId);
+      } catch {
+        // ignore
+      }
     } catch (error: any) {
       if (error.response?.status === 404) {
         // No cart exists yet
@@ -113,6 +119,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         notes: notes || "",
       });
       setCart(response.data);
+      try {
+        localStorage.setItem(LAST_CART_RESTAURANT_KEY, restaurantId);
+      } catch {
+        // ignore
+      }
     } catch (error) {
       console.error("Error adding to cart:", error);
       throw error;
@@ -184,6 +195,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         data: { restaurant_id: restaurantId },
       });
       setCart(null);
+      try {
+        localStorage.removeItem(LAST_CART_RESTAURANT_KEY);
+      } catch {
+        // ignore
+      }
     } catch (error) {
       console.error("Error clearing cart:", error);
       throw error;
@@ -210,6 +226,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     </CartContext.Provider>
   );
 }
+
+// Helper for consumers that need the last restaurant id even when cart is empty
+export const getLastCartRestaurantId = () => {
+  try {
+    return localStorage.getItem(LAST_CART_RESTAURANT_KEY) || "";
+  } catch {
+    return "";
+  }
+};
 
 export function useCart() {
   const context = useContext(CartContext);

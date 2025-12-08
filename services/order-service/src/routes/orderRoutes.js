@@ -5,7 +5,19 @@ const { authenticate, authorize } = require('../middleware/auth');
 const cart = require('../controllers/cartController');
 const order = require('../controllers/orderController');
 
+// Payment callback (service-to-service) - uses shared secret, no JWT
+router.post('/payment/callback', order.paymentCallback);
+
 router.use(authenticate);
+
+// Admin analytics
+router.get(
+  '/admin/analytics/revenue',
+  authorize('admin'),
+  order.getAdminRevenueSummary
+);
+// direct order creation (without cart)
+router.post('/', order.createOrder);
 
 // cart
 router.get('/cart', cart.getCart);
@@ -14,6 +26,7 @@ router.patch('/cart/items/:itemId', cart.updateItem);
 router.delete('/cart/items/:itemId', cart.removeItem);
 router.delete('/cart', cart.clearCart);
 router.post('/cart/checkout', cart.checkout);
+router.patch('/cart/address', cart.updateAddress);
 
 // restaurant (owner/admin)
 router.get(
@@ -21,10 +34,18 @@ router.get(
   authorize('owner', 'admin'),
   order.listRestaurantOrders
 );
+router.patch(
+  '/:orderId/status',
+  authorize('owner', 'admin'),
+  order.updateRestaurantStatus
+);
 
 // customer history
 router.get('/', order.listOrders);
 router.get('/:orderId', order.getOrder);
+
+// PIN verification for delivery
+router.post('/:orderId/verify-pin', order.verifyPin);
 
 // payment simulation (customer/admin)
 router.post('/:orderId/mock-pay', order.mockMarkPaid);

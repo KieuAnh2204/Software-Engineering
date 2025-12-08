@@ -7,6 +7,10 @@ const {
   clearCart,
   recalcTotal,
 } = require('../services/cartService');
+const { getIO } = require('../socket');
+const { AppError } = require('../utils/appError');
+
+const paymentMethods = ['cod', 'vnpay', 'momo', 'card'];
 
 exports.getCart = async (req, res, next) => {
   try {
@@ -112,11 +116,29 @@ exports.clearCart = async (req, res, next) => {
 exports.checkout = async (req, res, next) => {
   try {
     const customer_id = req.user.id;
-    const { restaurant_id, long_address, payment_method } = req.body;
+    const {
+      restaurant_id,
+      long_address,
+      payment_method,
+      phone_number,
+      instruction,
+    } = req.body;
     if (!restaurant_id || !payment_method) {
       return res.status(400).json({
         message: 'restaurant_id and payment_method are required',
       });
+    }
+    if (!paymentMethods.includes(payment_method)) {
+      throw AppError.badRequest('payment_method is invalid');
+    }
+    if (long_address !== undefined && typeof long_address !== 'string') {
+      throw AppError.badRequest('long_address must be a string');
+    }
+    if (instruction !== undefined && typeof instruction !== 'string') {
+      throw AppError.badRequest('instruction must be a string');
+    }
+    if (!phone_number || typeof phone_number !== 'string') {
+      throw AppError.badRequest('phone_number is required for delivery verification');
     }
 
     const order = await Order.findOne({
@@ -127,20 +149,72 @@ exports.checkout = async (req, res, next) => {
     if (!order || order.items.length === 0) {
       return res.status(400).json({ message: 'Cart is empty' });
     }
+    if (order.expires_at && order.expires_at < new Date()) {
+      order.status = 'expired';
+      order.updated_at = new Date();
+      await order.save();
+      throw AppError.badRequest('Cart expired, please start a new cart');
+    }
 
     recalcTotal(order);
     order.long_address = long_address;
     order.payment_method = payment_method;
-    order.status = 'submitted';
-    order.payment_status =
-      payment_method === 'cod' ? 'unpaid' : 'pending';
+    order.delivery_instruction = instruction;
+    
+    // Store phone number and generate PIN code
+    order.phone_number = phone_number;
+    const cleanPhone = phone_number.replace(/\D/g, '');
+    order.pin_code = cleanPhone.slice(-4).padStart(4, '0');
+    
+    order.status = payment_method === 'vnpay' ? 'payment_pending' : 'submitted';
+    order.payment_status = payment_method === 'cod' ? 'unpaid' : 'pending';
     order.submitted_at = new Date();
     order.updated_at = new Date();
     await order.save();
 
+    // Broadcast to customer and restaurant listeners
+    const io = getIO();
+    if (io) {
+      io.to(`customer-${order.customer_id}`).emit('order:update', order);
+      io.to(`restaurant-${order.restaurant_id}`).emit('order:update', order);
+    }
+
     // Optional: integrate with PAYMENT_SERVICE_URL here for non-COD
 
     res.json({ order });
+  } catch (e) {
+    next(e);
+  }
+};
+
+exports.updateAddress = async (req, res, next) => {
+  try {
+    const customer_id = req.user.id;
+    const { restaurant_id, long_address } = req.body;
+    if (!restaurant_id) {
+      return res
+        .status(400)
+        .json({ message: 'restaurant_id is required' });
+    }
+    if (!long_address || typeof long_address !== 'string') {
+      return res
+        .status(400)
+        .json({ message: 'long_address is required' });
+    }
+
+    const order = await Order.findOne({
+      customer_id,
+      restaurant_id,
+      status: 'cart',
+    });
+    if (!order) {
+      return res.status(404).json({ message: 'Cart not found' });
+    }
+    order.long_address = long_address;
+    order.updated_at = new Date();
+    await order.save();
+
+    res.json(order);
   } catch (e) {
     next(e);
   }

@@ -2,6 +2,46 @@ import Customer from '../models/Customer.js';
 import RestaurantOwner from '../models/RestaurantOwner.js';
 import User from '../models/User.js';
 
+export const updateUserActiveStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: 'isActive must be a boolean'
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { isActive },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
+      user
+    });
+  } catch (error) {
+    console.error('Error updating user active status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating user status',
+      error: error.message
+    });
+  }
+};
+
 export const getAllCustomers = async (req, res) => {
   try {
     const page = parseInt(req.query.page, 10) || 1;

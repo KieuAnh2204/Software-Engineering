@@ -2,7 +2,13 @@ import mongoose from 'mongoose';
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
+    const uri = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/user_service';
+
+    if (typeof uri !== 'string' || !uri.trim()) {
+      throw new Error('MONGODB_URI is not set. Define it in environment or .env');
+    }
+
+    const conn = await mongoose.connect(uri);
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
     
     // Drop invalid indexes from customers collection if exists
