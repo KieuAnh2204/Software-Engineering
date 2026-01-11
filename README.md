@@ -19,12 +19,6 @@ Người dùng có thể đặt món ăn từ các cửa hàng đối tác, than
 
 ---
 
-# Thành viên
-| Họ và tên | Mã số sinh viên |
-|-----------|------------------|
-| Võ Kiều Anh | 3122411009 |
-| Hồ Đăng Khoa | 3122411195 |
----
 ## Mục lục
 - [Tổng quan](#tổng-quan)
 - [Kiến trúc](#kiến-trúc)
