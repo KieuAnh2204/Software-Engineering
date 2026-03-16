@@ -1,14 +1,6 @@
 # FoodFast Delivery – Kiến trúc Microservices
 > Nền tảng microservices có khả năng mở rộng, cloud-native cho đặt đồ ăn trực tuyến.
 ---
-
-# SGU2025_CNPM_NHOM11
-
-**Học phần:** Công nghệ phần mềm  
-**Giảng viên:** TS. Nguyễn Quốc Huy  
-**Lớp:** DCT122C5  
-**Nhóm:** 11  
-
 ---
 # Tên đề tài
 **Tạo 4 services (User, Product, Order, Payment) giao tiếp với nhau**
